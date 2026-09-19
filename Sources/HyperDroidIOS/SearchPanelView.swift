@@ -32,6 +32,7 @@ struct HDSearchPanelView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .focused($searchFocused)
+                    .hdCursor(.ibeam)
             }
             .padding(.horizontal, 13)
             .frame(height: 38)
@@ -83,6 +84,7 @@ struct HDSearchPanelView: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
+                                .hdCursor(.hand)
                             }
                         }
                     } else {
