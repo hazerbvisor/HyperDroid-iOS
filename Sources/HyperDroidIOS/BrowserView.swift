@@ -115,6 +115,7 @@ struct HDBrowserView: View {
                         .onTapGesture {
                             selectTab(tab.id)
                         }
+                        .hdCursor(.hand)
                     }
                 }
                 .padding(.leading, 6)
@@ -128,6 +129,7 @@ struct HDBrowserView: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
+            .hdCursor(.hand)
             .padding(.leading, 4)
 
             Spacer(minLength: 0)
@@ -173,6 +175,7 @@ struct HDBrowserView: View {
                     .submitLabel(.go)
                     .onSubmit(loadAddress)
                     .foregroundColor(p.text)
+                    .hdCursor(.ibeam)
 
                 Button(action: {}) {
                     Image(systemName: "star")
@@ -235,6 +238,7 @@ struct HDBrowserView: View {
                 .frame(width: 52, height: 38)
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
         .background(danger ? Color.red.opacity(0.001) : Color.clear)
     }
 
@@ -246,6 +250,7 @@ struct HDBrowserView: View {
                 .frame(width: 34, height: 32)
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
     }
 
     private func addTab() {
@@ -341,6 +346,16 @@ private struct HDWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        let userContent = WKUserContentController()
+        userContent.add(context.coordinator, name: "hyperCursor")
+        userContent.addUserScript(
+            WKUserScript(
+                source: Self.cursorTrackingScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: false
+            )
+        )
+        config.userContentController = userContent
         config.defaultWebpagePreferences.allowsContentJavaScript = true
         config.defaultWebpagePreferences.preferredContentMode = .desktop
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -380,7 +395,37 @@ private struct HDWebView: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    private static let cursorTrackingScript = """
+    (() => {
+      let last = "";
+      const send = (kind) => {
+        if (kind === last) return;
+        last = kind;
+        try {
+          window.webkit.messageHandlers.hyperCursor.postMessage(kind);
+        } catch (_) {}
+      };
+
+      const cursorFor = (node) => {
+        if (!node || !node.closest) return "arrow";
+        if (node.closest("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")) {
+          return "ibeam";
+        }
+        if (node.closest("a, button, select, summary, label, [role='button'], [role='link'], [onclick]")) {
+          return "hand";
+        }
+        return "arrow";
+      };
+
+      document.addEventListener("pointermove", (event) => {
+        send(cursorFor(event.target));
+      }, { capture: true, passive: true });
+
+      document.addEventListener("pointerleave", () => send("arrow"), true);
+    })();
+    """
+
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         var parent: HDWebView
         var lastCommandSerial = 0
 
@@ -408,6 +453,25 @@ private struct HDWebView: UIViewRepresentable {
             let webTitle = webView.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             if !webTitle.isEmpty && parent.title != webTitle {
                 parent.title = webTitle
+            }
+        }
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "hyperCursor",
+                  let raw = message.body as? String else { return }
+
+            let kind: HDCursorKind
+            switch raw {
+            case "hand": kind = .hand
+            case "ibeam": kind = .ibeam
+            default: kind = .arrow
+            }
+
+            Task { @MainActor in
+                HDCursorState.shared.kind = kind
             }
         }
 
