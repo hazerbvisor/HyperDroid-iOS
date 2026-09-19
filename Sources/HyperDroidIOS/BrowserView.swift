@@ -24,6 +24,7 @@ private enum HDBrowserCommand: Equatable {
     case back
     case forward
     case reload
+    case load(URL)
 }
 
 struct HDBrowserView: View {
@@ -276,6 +277,7 @@ struct HDBrowserView: View {
             tabs[0].title = "New Tab"
             selectedTabID = tabs[0].id
             address = HDBrowserDefaults.homeURL.absoluteString
+            send(.load(HDBrowserDefaults.homeURL))
             return
         }
 
@@ -310,6 +312,7 @@ struct HDBrowserView: View {
         guard let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
         tabs[index].url = url
         address = url.absoluteString
+        send(.load(url))
     }
 
     private func send(_ value: HDBrowserCommand) {
@@ -360,10 +363,6 @@ private struct HDWebView: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         context.coordinator.parent = self
 
-        if uiView.url?.absoluteString != url.absoluteString && !uiView.isLoading {
-            uiView.load(URLRequest(url: url))
-        }
-
         if isActive && commandSerial != context.coordinator.lastCommandSerial {
             switch command {
             case .back:
@@ -372,6 +371,8 @@ private struct HDWebView: UIViewRepresentable {
                 if uiView.canGoForward { uiView.goForward() }
             case .reload:
                 uiView.reload()
+            case .load(let destination):
+                uiView.load(URLRequest(url: destination))
             case .none:
                 break
             }
@@ -385,6 +386,18 @@ private struct HDWebView: UIViewRepresentable {
 
         init(_ parent: HDWebView) {
             self.parent = parent
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
+            if let currentURL = navigationAction.request.url,
+               parent.url != currentURL {
+                parent.url = currentURL
+            }
+            decisionHandler(.allow)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
