@@ -7,11 +7,18 @@
   "targets": [
     {
       "name": "HyperDroidIOS",
-      "sources": ["Sources/HyperDroidIOS"],
+      "sources": [
+        "Sources/HyperDroidIOS"
+      ],
       "parseAsLibrary": false
     }
   ],
-  "frameworks": ["Foundation", "SwiftUI", "UIKit"],
+  "frameworks": [
+    "Foundation",
+    "SwiftUI",
+    "UIKit",
+    "WebKit"
+  ],
   "infoPlist": "HyperDroidIOSInfo.plist",
   "shortVersion": "0.1.0",
   "buildVersion": "1",
