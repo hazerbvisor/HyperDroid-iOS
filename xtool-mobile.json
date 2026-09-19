@@ -19,6 +19,12 @@
     "UIKit",
     "WebKit"
   ],
+  "resources": [
+    {
+      "path": "Resources/hyperdroid_ui_atlas.png",
+      "destination": "hyperdroid_ui_atlas.png"
+    }
+  ],
   "infoPlist": "HyperDroidIOSInfo.plist",
   "shortVersion": "0.1.0",
   "buildVersion": "1",
