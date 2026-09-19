@@ -8,6 +8,8 @@ struct HDMetrics {
     var taskbarHeight: CGFloat { landscape ? 40 : 60 }
     var taskbarAppSize: CGFloat { landscape ? 22 : 32 }
     var taskbarButtonSize: CGFloat { landscape ? 40 : 50 }
+    var taskbarSearchWidth: CGFloat { landscape ? 152 : 132 }
+    var taskbarSearchHeight: CGFloat { landscape ? 30 : 38 }
     var taskbarAppPaddingHorizontal: CGFloat { landscape ? 4 : 7 }
     var taskbarMarginBottom: CGFloat { landscape ? 0 : 6 }
     var taskbarMarginHorizontal: CGFloat { landscape ? 0 : 10 }
@@ -107,6 +109,24 @@ struct HDImage: View {
                 .aspectRatio(contentMode: contentMode)
         } else {
             Color.clear
+        }
+    }
+}
+
+
+struct HDGlassSurface: View {
+    let tint: Color
+    let enabled: Bool
+    var tintOpacity: Double = 0.58
+
+    var body: some View {
+        ZStack {
+            if enabled {
+                Rectangle().fill(.ultraThinMaterial)
+                tint.opacity(tintOpacity)
+            } else {
+                tint
+            }
         }
     }
 }
