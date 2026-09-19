@@ -18,7 +18,7 @@ struct HDTaskbarView: View {
 
     @AppStorage("hd.taskbarAlignment") private var alignment = "Center"
     @AppStorage("hd.taskbarShowWidgets") private var showWidgets = true
-    @AppStorage("hd.taskbarShowSearch") private var showSearch = true
+    @AppStorage("hd.taskbarSearchMode") private var searchMode = "Search box"
     @AppStorage("hd.taskbarShowClock") private var showClock = true
     @AppStorage("hd.taskbarShowSeconds") private var showSeconds = false
     @AppStorage("hd.use24Hour") private var use24Hour = false
@@ -62,7 +62,7 @@ struct HDTaskbarView: View {
                     action: onToggleStart
                 )
 
-                if showSearch {
+                if searchMode == "Search box" {
                     Button(action: onSearch) {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
@@ -82,6 +82,14 @@ struct HDTaskbarView: View {
                             RoundedRectangle(cornerRadius: 7)
                                 .stroke(p.border.opacity(0.42), lineWidth: 1)
                         )
+                    }
+                    .buttonStyle(.plain)
+                } else if searchMode == "Search icon" {
+                    Button(action: onSearch) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(p.text)
+                            .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
                     }
                     .buttonStyle(.plain)
                 }
@@ -120,19 +128,18 @@ struct HDTaskbarView: View {
 
                 Button(action: onToggleActionCenter) {
                     HStack(spacing: 5) {
-                        HDImage(
-                            name: system.networkConnected ? "menu_ic_internet_20_regular" : "ui_tb_globe_prohibited_24_regular",
-                            template: true,
-                            tint: p.text
-                        )
-                        .frame(width: 15, height: 15)
+                        Image(systemName: networkSymbol)
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(width: 15, height: 15)
 
-                        HDImage(name: "ui_tb_speaker_2_24_regular", template: true, tint: p.text)
+                        Image(systemName: system.outputVolume < 0.01 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 12, weight: .medium))
                             .frame(width: 15, height: 15)
 
                         ZStack(alignment: .topTrailing) {
-                            HDImage(name: "ui_tb_battery_10_24", template: true, tint: p.text)
-                                .frame(width: 15, height: 15)
+                            Image(systemName: batterySymbol)
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(width: 18, height: 15)
 
                             if system.charging {
                                 Image(systemName: "bolt.fill")
@@ -175,6 +182,26 @@ struct HDTaskbarView: View {
         .frame(height: metrics.taskbarHeight)
         .padding(.horizontal, metrics.taskbarMarginHorizontal)
         .padding(.bottom, metrics.taskbarMarginBottom)
+    }
+
+    private var networkSymbol: String {
+        guard system.networkConnected else { return "network.slash" }
+        switch system.networkKind {
+        case "Wi-Fi": return "wifi"
+        case "Cellular": return "antenna.radiowaves.left.and.right"
+        case "Ethernet": return "network"
+        default: return "network"
+        }
+    }
+
+    private var batterySymbol: String {
+        switch system.batteryPercent {
+        case 0..<13: return "battery.0"
+        case 13..<38: return "battery.25"
+        case 38..<63: return "battery.50"
+        case 63..<88: return "battery.75"
+        default: return "battery.100"
+        }
     }
 
     private func clockText(_ date: Date) -> String {
