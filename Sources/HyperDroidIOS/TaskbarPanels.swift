@@ -2,13 +2,18 @@ import SwiftUI
 
 struct HDActionCenterView: View {
     let onOpenSettings: () -> Void
+
     @Environment(\.colorScheme) private var scheme
-    @AppStorage("hd.volume") private var volume = 0.50
+    @ObservedObject private var system = HDSystemStatus.shared
+
     @AppStorage("hd.bluetooth") private var bluetooth = true
     @AppStorage("hd.nearbySharing") private var nearbySharing = true
     @AppStorage("hd.webAccess") private var webAccess = true
     @AppStorage("hd.theme") private var theme = "Dark"
+    @AppStorage("hd.transparency") private var transparency = true
+
     @State private var accessibility = false
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     private let items: [(String, String)] = [
@@ -22,19 +27,29 @@ struct HDActionCenterView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                spacing: 12
+            ) {
                 ForEach(items, id: \.0) { item in
                     VStack(spacing: 6) {
                         Button {
                             toggle(item.0)
                         } label: {
-                            HDImage(name: item.1, template: true, tint: isEnabled(item.0) ? .white : p.text)
-                                .frame(width: 20, height: 20)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(isEnabled(item.0) ? p.primary : p.dialogBody)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
-                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(p.border.opacity(0.45), lineWidth: 1))
+                            HDImage(
+                                name: item.1,
+                                template: true,
+                                tint: isEnabled(item.0) ? .white : p.text
+                            )
+                            .frame(width: 20, height: 20)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(isEnabled(item.0) ? p.primary : p.dialogBody.opacity(0.72))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(p.border.opacity(0.45), lineWidth: 1)
+                            )
                         }
                         .buttonStyle(.plain)
 
@@ -48,21 +63,60 @@ struct HDActionCenterView: View {
             }
             .padding(20)
 
-            HStack(spacing: 14) {
-                HDImage(name: "ui_tb_speaker_2_24_regular", template: true, tint: p.text)
+            VStack(spacing: 7) {
+                HStack {
+                    HDImage(
+                        name: "ui_tb_speaker_2_24_regular",
+                        template: true,
+                        tint: p.text
+                    )
                     .frame(width: 20, height: 20)
-                Slider(value: $volume, in: 0...1)
+
+                    HDSystemVolumeView()
+                        .frame(height: 30)
+
+                    Text("\(Int((system.outputVolume * 100).rounded()))%")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(p.mutedText)
+                        .frame(width: 34, alignment: .trailing)
+                }
+
+                HStack {
+                    Image(systemName: system.networkConnected ? "network" : "network.slash")
+                        .font(.system(size: 11))
+                    Text(system.networkConnected ? system.networkKind : "Offline")
+                        .font(.system(size: 10.5))
+                    Spacer()
+                }
+                .foregroundColor(p.mutedText)
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 20)
+            .padding(.bottom, 18)
 
             HStack {
                 HStack(spacing: 6) {
-                    HDImage(name: "ui_tb_battery_10_24", template: true, tint: p.text)
+                    ZStack(alignment: .topTrailing) {
+                        HDImage(
+                            name: "ui_tb_battery_10_24",
+                            template: true,
+                            tint: p.text
+                        )
                         .frame(width: 20, height: 20)
-                    Text("97%").font(.system(size: 11.5))
+
+                        if system.charging {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundColor(p.primary)
+                                .offset(x: 4, y: -3)
+                        }
+                    }
+
+                    Text("\(system.batteryPercent)%")
+                        .font(.system(size: 11.5))
                 }
+
                 Spacer()
+
                 Button(action: onOpenSettings) {
                     HDImage(name: "ic_settings_24_regular", template: true, tint: p.text)
                         .frame(width: 20, height: 20)
@@ -76,31 +130,49 @@ struct HDActionCenterView: View {
             .background(p.footer)
         }
         .frame(width: 330)
-        .background(p.startMenu)
+        .background {
+            HDGlassSurface(
+                tint: p.startMenu,
+                enabled: transparency,
+                tintOpacity: scheme == .dark ? 0.64 : 0.78
+            )
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border.opacity(0.8), lineWidth: 1))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
     }
 
     private func isEnabled(_ item: String) -> Bool {
         switch item {
-        case "Wi-Fi", "Internet": return webAccess
-        case "Bluetooth": return bluetooth
-        case "Nearby sharing": return nearbySharing
-        case "Theme": return theme == "Dark"
-        case "Accessibility": return accessibility
-        default: return false
+        case "Wi-Fi", "Internet":
+            return system.networkConnected && webAccess
+        case "Bluetooth":
+            return bluetooth
+        case "Nearby sharing":
+            return nearbySharing
+        case "Theme":
+            return theme == "Dark"
+        case "Accessibility":
+            return accessibility
+        default:
+            return false
         }
     }
 
     private func toggle(_ item: String) {
         switch item {
-        case "Wi-Fi", "Internet": webAccess.toggle()
-        case "Bluetooth": bluetooth.toggle()
-        case "Nearby sharing": nearbySharing.toggle()
-        case "Theme": theme = theme == "Dark" ? "Light" : "Dark"
-        case "Accessibility": accessibility.toggle()
-        default: break
+        case "Wi-Fi", "Internet":
+            webAccess.toggle()
+        case "Bluetooth":
+            bluetooth.toggle()
+        case "Nearby sharing":
+            nearbySharing.toggle()
+        case "Theme":
+            theme = theme == "Dark" ? "Light" : "Dark"
+        case "Accessibility":
+            accessibility.toggle()
+        default:
+            break
         }
     }
 }
@@ -108,6 +180,8 @@ struct HDActionCenterView: View {
 struct HDCalendarPanelView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var date = Date()
+    @AppStorage("hd.transparency") private var transparency = true
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
@@ -116,11 +190,13 @@ struct HDCalendarPanelView: View {
                 Text(date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
                     .font(.system(size: 14))
                     .foregroundColor(p.text)
+
                 Spacer()
+
                 HDImage(name: "ic_arrow_down_14_light", template: true, tint: p.text)
                     .frame(width: 14, height: 14)
                     .frame(width: 26, height: 26)
-                    .background(p.dialogBody)
+                    .background(p.dialogBody.opacity(0.72))
                     .clipShape(RoundedRectangle(cornerRadius: 5))
             }
             .padding(.horizontal, 16)
@@ -134,16 +210,25 @@ struct HDCalendarPanelView: View {
                 .padding(.bottom, 8)
         }
         .frame(width: 340)
-        .background(p.startMenu)
+        .background {
+            HDGlassSurface(
+                tint: p.startMenu,
+                enabled: transparency,
+                tintOpacity: scheme == .dark ? 0.64 : 0.78
+            )
+        }
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border.opacity(0.8), lineWidth: 1))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
     }
 }
 
 struct HDMoreIconsPanelView: View {
     let onOpenInstaller: () -> Void
+
     @Environment(\.colorScheme) private var scheme
+    @AppStorage("hd.transparency") private var transparency = true
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
@@ -153,9 +238,15 @@ struct HDMoreIconsPanelView: View {
             popupButton("img_file_apk", action: onOpenInstaller)
         }
         .padding(4)
-        .background(p.startMenu)
+        .background {
+            HDGlassSurface(
+                tint: p.startMenu,
+                enabled: transparency,
+                tintOpacity: scheme == .dark ? 0.64 : 0.78
+            )
+        }
         .clipShape(RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(p.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 7).stroke(p.border.opacity(0.8), lineWidth: 1))
         .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
     }
 
