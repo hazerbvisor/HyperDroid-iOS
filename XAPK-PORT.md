@@ -2,25 +2,43 @@
 
 Source UI: `HyperDroid - PC Launcher 2.7` XAPK (`com.binary.hyperdroid`, versionCode 21).
 
-This branch does **not** redesign HyperDroid. The SwiftUI hierarchy is translated from the app's compiled Android resources.
+This branch does **not** redesign HyperDroid. The iOS hierarchy is translated from the app's compiled Android resources and keeps the original resource measurements and artwork wherever the platform permits.
 
-## Ported source layouts in this pass
+## Ported source layouts
 
+Desktop and shell:
 - `res/layout/activity_main.xml`
 - `res/layout-land/taskbar.xml`
 - `res/layout/start_menu.xml`
 - `res/layout/start_menu_item.xml`
 - `res/layout/desktop_item.xml`
 - `res/layout/taskbar_item.xml`
+- `res/layout/ui_app_titlebar.xml`
+
+Taskbar popups:
+- `res/layout/taskbar_dialog_action_center.xml`
+- `res/layout/taskbar_dialog_action_widgets.xml`
+- `res/layout/taskbar_dialog_action_date.xml`
+- `res/layout/taskbar_dialog_more_icons.xml`
+
+File Explorer:
 - `res/layout/explorer.xml`
 - `res/layout-land/explorer_top_navigation.xml`
 - `res/layout-land/explorer_side_navigation.xml`
 - `res/layout/explorer_item_lg_folder.xml`
 - `res/layout/explorer_item_lg_drive.xml`
+
+Settings:
 - `res/layout/settings.xml`
 - `res/layout/settings_app_navigation.xml`
 - `res/layout/settings_personalize.xml`
-- `res/layout/ui_app_titlebar.xml`
+
+Built-in app windows:
+- `res/layout/app_browser.xml` → native WKWebView content with the HyperDroid browser chrome
+- `res/layout/app_image_viewer.xml`
+- `res/layout/app_music_player.xml`
+- `res/layout/app_notepad.xml`
+- `res/layout/app_ui_installer.xml`
 
 ## Directly preserved landscape dimensions
 
@@ -36,9 +54,19 @@ This branch does **not** redesign HyperDroid. The SwiftUI hierarchy is translate
 - titlebar action buttons: 52dp
 - Explorer side navigation: 160dp
 - Explorer navigation buttons: 32dp
+- Settings navigation/content split: 25% / 75%
 
-Original PNG/WebP resources used by these views were extracted from the supplied XAPK. Monochrome Android vector drawables used in the shell were rasterized as template PNG resources so SwiftUI can tint them according to the original light/dark resource colors.
+## Assets
 
-## Next pass
+The application icons, File Explorer graphics, taskbar graphics, title-bar controls and other UI artwork are extracted from the supplied XAPK. Android vector resources required by the port are rasterized losslessly as tintable template images. The primary artwork is packed into an embedded atlas so the XTool build does not depend on an external asset-copy step.
 
-Port remaining app-specific layouts/behavior (Chrome/WebView, Photos, Music, Notepad, Installer), context menus, action-center dialogs, Start search results, Settings subpages, drag/resize behavior, and imported wallpaper handling.
+## iOS platform substitutions
+
+The UI remains HyperDroid's UI. Only Android-specific system behavior is substituted:
+- Android WebView → WKWebView
+- Android CalendarView → SwiftUI graphical DatePicker
+- Android SeekBar → SwiftUI Slider
+- Android EditText → SwiftUI TextField/TextEditor
+- Android installed-app/package enumeration is not exposed by normal iOS APIs, so Start entries currently use HyperDroid's built-in desktop apps.
+
+The Android wallpaper view is runtime/user supplied rather than a fixed APK drawable. The iOS shell therefore leaves the desktop wallpaper surface independent so a user-selected wallpaper can be wired without changing the UI hierarchy.
