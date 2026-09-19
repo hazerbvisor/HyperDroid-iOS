@@ -296,6 +296,8 @@ struct HDCalendarPanelView: View {
 }
 
 struct HDMoreIconsPanelView: View {
+    let onOpenSecurity: () -> Void
+    let onOpenDevices: () -> Void
     let onOpenInstaller: () -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -305,8 +307,8 @@ struct HDMoreIconsPanelView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            popupButton("img_defender", action: {})
-            popupButton("img_mouse", action: {})
+            popupButton("img_defender", action: onOpenSecurity)
+            popupButton("img_mouse", action: onOpenDevices)
             popupButton("img_file_apk", action: onOpenInstaller)
         }
         .padding(4)
