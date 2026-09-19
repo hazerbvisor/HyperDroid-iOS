@@ -531,7 +531,7 @@ struct FileExplorerPane: View {
                         VStack(spacing: 8) {
                             Image(systemName: url.hasDirectoryPath ? "folder.fill" : "doc.fill")
                                 .font(.system(size: 30))
-                                .foregroundStyle(url.hasDirectoryPath ? .yellow : .white.opacity(0.8))
+                                .foregroundColor(url.hasDirectoryPath ? Color.yellow : Color.white.opacity(0.8))
                             Text(url.lastPathComponent)
                                 .font(.caption)
                                 .lineLimit(2)
@@ -541,11 +541,17 @@ struct FileExplorerPane: View {
                     }
 
                     if entries.isEmpty {
-                        ContentUnavailableView(
-                            "No files yet",
-                            systemImage: "folder",
-                            description: Text("Files in HyperDroid's Documents folder will appear here.")
-                        )
+                        VStack(spacing: 10) {
+                            Image(systemName: "folder")
+                                .font(.system(size: 36))
+                                .foregroundStyle(.secondary)
+                            Text("No files yet")
+                                .font(.headline)
+                            Text("Files in HyperDroid's Documents folder will appear here.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
                         .frame(minWidth: 320, minHeight: 220)
                     }
                 }
@@ -595,7 +601,6 @@ struct SettingsPane: View {
                 LabeledContent("System launcher replacement", value: "Not available on iOS")
             }
         }
-        .formStyle(.grouped)
     }
 }
 
