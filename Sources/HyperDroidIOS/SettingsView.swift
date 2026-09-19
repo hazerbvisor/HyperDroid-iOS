@@ -186,7 +186,7 @@ struct HDSettingsView: View {
             }
 
             settingsSection("Sound") {
-                sliderRow("Volume", subtitle: "HyperDroid action-center volume", value: $volume, range: 0...1, suffix: "")
+                systemVolumeRow
             }
 
             settingsSection("Notifications") {
@@ -534,6 +534,27 @@ struct HDSettingsView: View {
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 60)
+        .overlay(divider, alignment: .bottom)
+    }
+
+    private var systemVolumeRow: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Volume")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(p.text)
+                Text("Control the iPad system output volume")
+                    .font(.system(size: 10.8))
+                    .foregroundColor(p.mutedText)
+            }
+
+            Spacer()
+
+            HDSystemVolumeView()
+                .frame(width: 150, height: 30)
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 64)
         .overlay(divider, alignment: .bottom)
     }
 
