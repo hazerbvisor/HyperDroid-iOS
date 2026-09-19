@@ -292,7 +292,7 @@ private struct HDWindowView: View {
         .frame(height: 38)
         .contentShape(Rectangle())
         .gesture(
-            DragGesture(minimumDistance: state.maximized ? 10000 : 1)
+            DragGesture(minimumDistance: state.maximized ? 10000 : 1, coordinateSpace: .global)
                 .onChanged { value in
                     if !dragStarted {
                         dragStarted = true
