@@ -10,6 +10,7 @@ struct DesktopView: View {
     var body: some View {
         GeometryReader { geo in
             let metrics = HDMetrics.forSize(geo.size)
+
             ZStack(alignment: .bottom) {
                 Color.black.ignoresSafeArea()
 
@@ -23,16 +24,29 @@ struct DesktopView: View {
                         active: controller.activeWindowID == window.id,
                         onFocus: { controller.focus(window.id) },
                         onClose: { controller.close(window.id) },
-                        onMove: { controller.move(window.id, by: $0) },
+                        onMove: {
+                            controller.move(
+                                window.id,
+                                by: $0,
+                                desktop: geo.size,
+                                taskbarHeight: metrics.taskbarHeight
+                            )
+                        },
                         onMaximize: { controller.toggleMaximize(window.id) }
                     )
                     .zIndex(Double(window.z))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.94).combined(with: .opacity),
+                            removal: .scale(scale: 0.97).combined(with: .opacity)
+                        )
+                    )
                 }
 
                 if controller.startMenuVisible || actionCenterVisible || calendarVisible || moreIconsVisible {
                     Color.black.opacity(0.001)
                         .contentShape(Rectangle())
-                        .onTapGesture { dismissPopups() }
+                        .onTapGesture { dismissPopups(animated: true) }
                         .zIndex(8900)
                 }
 
@@ -41,28 +55,31 @@ struct DesktopView: View {
                         open(app.kind, in: geo.size, metrics: metrics)
                     }
                     .padding(.bottom, metrics.startMarginBottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(10000)
                 }
 
                 if moreIconsVisible {
                     HDMoreIconsPanelView {
-                        dismissPopups()
+                        dismissPopups(animated: true)
                         open(.installer, in: geo.size, metrics: metrics)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(.trailing, 205)
+                    .padding(.trailing, 190)
                     .padding(.bottom, metrics.taskbarHeight + 6)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(10020)
                 }
 
                 if actionCenterVisible {
                     HDActionCenterView {
-                        dismissPopups()
+                        dismissPopups(animated: true)
                         open(.settings, in: geo.size, metrics: metrics)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .padding(.trailing, 8)
                     .padding(.bottom, metrics.taskbarHeight + 6)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                     .zIndex(10030)
                 }
 
@@ -71,6 +88,7 @@ struct DesktopView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .padding(.trailing, 8)
                         .padding(.bottom, metrics.taskbarHeight + 6)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                         .zIndex(10030)
                 }
 
@@ -81,25 +99,33 @@ struct DesktopView: View {
                     startMenuVisible: controller.startMenuVisible,
                     onToggleStart: {
                         let next = !controller.startMenuVisible
-                        dismissPopups()
-                        controller.startMenuVisible = next
+                        dismissPopups(animated: false)
+                        withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) {
+                            controller.startMenuVisible = next
+                        }
                     },
                     onOpen: { open($0, in: geo.size, metrics: metrics) },
                     onFocus: { controller.focus($0) },
                     onToggleMore: {
                         let next = !moreIconsVisible
-                        dismissPopups()
-                        moreIconsVisible = next
+                        dismissPopups(animated: false)
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.90)) {
+                            moreIconsVisible = next
+                        }
                     },
                     onToggleActionCenter: {
                         let next = !actionCenterVisible
-                        dismissPopups()
-                        actionCenterVisible = next
+                        dismissPopups(animated: false)
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.90)) {
+                            actionCenterVisible = next
+                        }
                     },
                     onToggleCalendar: {
                         let next = !calendarVisible
-                        dismissPopups()
-                        calendarVisible = next
+                        dismissPopups(animated: false)
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.90)) {
+                            calendarVisible = next
+                        }
                     }
                 )
                 .zIndex(20000)
@@ -108,11 +134,19 @@ struct DesktopView: View {
         }
     }
 
-    private func dismissPopups() {
-        controller.startMenuVisible = false
-        actionCenterVisible = false
-        calendarVisible = false
-        moreIconsVisible = false
+    private func dismissPopups(animated: Bool) {
+        let changes = {
+            controller.startMenuVisible = false
+            actionCenterVisible = false
+            calendarVisible = false
+            moreIconsVisible = false
+        }
+
+        if animated {
+            withAnimation(.easeOut(duration: 0.16), changes)
+        } else {
+            changes()
+        }
     }
 
     @ViewBuilder
@@ -137,6 +171,7 @@ struct DesktopView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
             Spacer()
         }
         .padding(.top, 8)
@@ -146,6 +181,7 @@ struct DesktopView: View {
 
     private func open(_ kind: HDAppEntry.Kind, in size: CGSize, metrics: HDMetrics) {
         let window: HDWindowKind
+
         switch kind {
         case .explorer: window = .explorer
         case .settings: window = .settings
@@ -155,6 +191,7 @@ struct DesktopView: View {
         case .notepad: window = .notepad
         case .installer: window = .installer
         }
+
         controller.open(window, desktop: size, taskbarHeight: metrics.taskbarHeight)
     }
 }
@@ -171,19 +208,20 @@ private struct HDWindowView: View {
 
     @Environment(\.colorScheme) private var scheme
     @State private var drag: CGSize = .zero
+    @State private var dragStarted = false
 
     private var palette: HDPalette { HDPalette(scheme: scheme) }
 
     private var size: CGSize {
         state.maximized
-        ? CGSize(width: desktopSize.width, height: desktopSize.height - taskbarHeight)
-        : state.size
+            ? CGSize(width: desktopSize.width, height: desktopSize.height - taskbarHeight)
+            : state.size
     }
 
     private var center: CGPoint {
         state.maximized
-        ? CGPoint(x: desktopSize.width / 2, y: (desktopSize.height - taskbarHeight) / 2)
-        : CGPoint(x: state.center.x + drag.width, y: state.center.y + drag.height)
+            ? CGPoint(x: desktopSize.width / 2, y: (desktopSize.height - taskbarHeight) / 2)
+            : CGPoint(x: state.center.x + drag.width, y: state.center.y + drag.height)
     }
 
     var body: some View {
@@ -193,10 +231,21 @@ private struct HDWindowView: View {
                     onFocus: onFocus,
                     onClose: onClose,
                     onMaximize: onMaximize,
-                    onMove: onMove
+                    onDragChanged: { value in
+                        if !state.maximized {
+                            drag = value
+                        }
+                    },
+                    onDragEnded: { value in
+                        if !state.maximized {
+                            onMove(value)
+                        }
+                        drag = .zero
+                    }
                 )
             } else {
                 titlebar
+
                 Group {
                     switch state.kind {
                     case .explorer: HDExplorerView()
@@ -212,13 +261,14 @@ private struct HDWindowView: View {
         }
         .frame(width: size.width, height: size.height)
         .background(palette.dialog)
-        .clipShape(RoundedRectangle(cornerRadius: state.maximized ? 0 : 3))
+        .clipShape(RoundedRectangle(cornerRadius: state.maximized ? 0 : 4))
         .overlay(
-            RoundedRectangle(cornerRadius: state.maximized ? 0 : 3)
-                .stroke(palette.border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: state.maximized ? 0 : 4)
+                .stroke(active ? palette.border.opacity(0.95) : palette.border.opacity(0.65), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(state.maximized ? 0 : 0.35), radius: 18, y: 7)
+        .shadow(color: .black.opacity(state.maximized ? 0 : (active ? 0.38 : 0.24)), radius: active ? 18 : 12, y: 7)
         .position(center)
+        .animation(.spring(response: 0.32, dampingFraction: 0.90), value: state.maximized)
         .onTapGesture(perform: onFocus)
     }
 
@@ -234,6 +284,7 @@ private struct HDWindowView: View {
             .padding(.leading, 12)
 
             Spacer(minLength: 0)
+
             titleButton("app_title_ic_minimize_15", action: onFocus)
             titleButton("app_title_ic_resize_15", action: onMaximize)
             titleButton("app_title_ic_close_16", danger: true, action: onClose)
@@ -243,12 +294,16 @@ private struct HDWindowView: View {
         .gesture(
             DragGesture(minimumDistance: state.maximized ? 10000 : 1)
                 .onChanged { value in
-                    onFocus()
+                    if !dragStarted {
+                        dragStarted = true
+                        onFocus()
+                    }
                     drag = value.translation
                 }
                 .onEnded { value in
                     onMove(value.translation)
                     drag = .zero
+                    dragStarted = false
                 }
         )
     }
