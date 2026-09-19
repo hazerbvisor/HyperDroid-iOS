@@ -1,0 +1,26 @@
+name: iOS Source Typecheck
+
+on:
+  push:
+    branches:
+      - port/xapk-ui
+  workflow_dispatch:
+
+jobs:
+  typecheck:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typecheck iOS sources
+        run: |
+          xcrun --sdk iphoneos swiftc \
+            -target arm64-apple-ios16.0 \
+            -parse-as-library \
+            -typecheck \
+            Sources/HyperDroidIOS/*.swift \
+            -framework Foundation \
+            -framework SwiftUI \
+            -framework UIKit \
+            -framework WebKit
+      - name: Validate XTool manifest
+        run: python3 -m json.tool xtool-mobile.json >/dev/null
