@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct HDSettingsView: View {
     @Environment(\.colorScheme) private var scheme
@@ -212,18 +213,24 @@ struct HDSettingsView: View {
 
     private var devicesPage: some View {
         settingsStack {
-            settingsSection("Bluetooth") {
-                toggleRow("Bluetooth", subtitle: "Show Bluetooth as enabled in the desktop shell", value: $bluetooth)
-                toggleRow("Discoverable", subtitle: "Allow HyperDroid device discovery workflows", value: $discoverable)
+            actionRow("Add device", subtitle: "Open the device setup options available to HyperDroid") {
+                discoverable = true
+                updateMessage = "HyperDroid is ready to discover supported devices"
+            }
+
+            settingsSection("Bluetooth & devices") {
+                toggleRow("Bluetooth", subtitle: "HyperDroid Bluetooth integration state", value: $bluetooth)
+                infoRow("Mouse", value: naturalScrolling ? "Natural scrolling" : "Standard scrolling")
+                infoRow("Printer", value: "AirPrint / iPadOS")
+            }
+
+            settingsSection("Mouse") {
+                sliderRow("Pointer speed", subtitle: "Pointer movement preference for HyperDroid", value: $pointerSpeed, range: 0...1, suffix: "")
+                toggleRow("Natural scrolling", subtitle: "Use natural scrolling preference", value: $naturalScrolling)
             }
 
             settingsSection("Sharing") {
                 toggleRow("Nearby sharing", subtitle: "Enable HyperDroid nearby-sharing actions", value: $nearbySharing)
-            }
-
-            settingsSection("Mouse & trackpad") {
-                sliderRow("Pointer speed", subtitle: "Pointer movement preference for HyperDroid", value: $pointerSpeed, range: 0...1, suffix: "")
-                toggleRow("Natural scrolling", subtitle: "Use natural scrolling preference", value: $naturalScrolling)
             }
         }
     }
@@ -364,6 +371,23 @@ struct HDSettingsView: View {
 
     private var privacyPage: some View {
         settingsStack {
+            actionRow("Storage Permission", subtitle: "Manage HyperDroid file access") {
+                fileAccess = true
+                updateMessage = "File access enabled for the HyperDroid workspace"
+            }
+
+            actionRow("App Info", subtitle: "Open this app’s iPadOS settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+
+            actionRow("Privacy Policy", subtitle: "Open the HyperDroid privacy policy") {
+                if let url = URL(string: "https://github.com/windows-ui/HyperDroid/tree/main/PrivacyPolicy") {
+                    UIApplication.shared.open(url)
+                }
+            }
+
             settingsSection("App permissions") {
                 toggleRow("Web access", subtitle: "Allow HyperDroid browser and web apps to access the network", value: $webAccess)
                 toggleRow("Files", subtitle: "Allow HyperDroid apps to use the app file workspace", value: $fileAccess)
@@ -379,16 +403,17 @@ struct HDSettingsView: View {
 
     private var updatesPage: some View {
         settingsStack {
-            settingsSection("HyperDroid updates") {
+            settingsSection("Update center") {
                 HStack(spacing: 14) {
-                    HDImage(name: "img_app_settings")
-                        .frame(width: 38, height: 38)
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 30))
+                        .foregroundColor(p.primary)
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("HyperDroid iOS")
+                        Text("Update center")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(p.text)
-                        Text("Version 0.1.0")
+                        Text("HyperDroid iOS 0.1.0")
                             .font(.system(size: 11.5))
                             .foregroundColor(p.mutedText)
                     }
@@ -397,7 +422,11 @@ struct HDSettingsView: View {
                 }
                 .padding(12)
 
-                toggleRow("Automatic updates", subtitle: "Remember the preferred update behavior", value: $autoUpdate)
+                toggleRow(
+                    "Get updates as soon as they’re available",
+                    subtitle: "Prefer the newest HyperDroid build",
+                    value: $autoUpdate
+                )
 
                 pickerRow(
                     "Update channel",
@@ -416,9 +445,20 @@ struct HDSettingsView: View {
                 }
             }
 
-            actionRow("Check for updates", subtitle: "Record a local update check for this build") {
+            actionRow("Check for updates", subtitle: "Check the installed HyperDroid build status") {
                 lastUpdateCheck = Date().timeIntervalSince1970
                 updateMessage = "You’re up to date"
+            }
+
+            actionRow("Rate Us", subtitle: "Open the HyperDroid project page") {
+                if let url = URL(string: "https://github.com/windows-ui/HyperDroid") {
+                    UIApplication.shared.open(url)
+                }
+            }
+
+            actionRow("Share this app", subtitle: "Copy the HyperDroid project link") {
+                UIPasteboard.general.string = "https://github.com/windows-ui/HyperDroid"
+                updateMessage = "HyperDroid link copied"
             }
         }
     }
