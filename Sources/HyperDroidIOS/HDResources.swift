@@ -58,7 +58,10 @@ extension Color {
 
 enum HDAsset {
     private static let atlas: UIImage? = {
-        guard let data = Data(base64Encoded: HDAtlasData.value) else { return nil }
+        let encoded = HDAtlasData.value
+        let paddingCount = (4 - (encoded.count % 4)) % 4
+        let padded = encoded + String(repeating: "=", count: paddingCount)
+        guard let data = Data(base64Encoded: padded) else { return nil }
         return UIImage(data: data)
     }()
 
