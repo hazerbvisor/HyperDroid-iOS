@@ -64,6 +64,7 @@ final class HDCursorPackManager: ObservableObject {
         )
 
         var imported = 0
+        var firstFailure: Error?
         let supported = Set(HDCursorKind.allCases.map(\.fileName))
 
         for url in urls {
@@ -77,16 +78,78 @@ final class HDCursorPackManager: ObservableObject {
                 }
             }
 
-            let destination = packDirectory.appendingPathComponent(name)
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
+            do {
+                let data = try coordinatedDataRead(from: url)
+
+                guard data.count >= 6,
+                      Self.readUInt16(data, 0) == 0,
+                      Self.readUInt16(data, 2) == 2 else {
+                    throw NSError(
+                        domain: "HyperDroid.CursorImport",
+                        code: 2,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "\(url.lastPathComponent) is not a valid Windows .cur file."
+                        ]
+                    )
+                }
+
+                let destination = packDirectory.appendingPathComponent(name)
+                try data.write(to: destination, options: .atomic)
+                imported += 1
+            } catch {
+                if firstFailure == nil {
+                    firstFailure = error
+                }
             }
-            try FileManager.default.copyItem(at: url, to: destination)
-            imported += 1
         }
 
         reload()
+
+        if imported == 0, let firstFailure {
+            throw firstFailure
+        }
+
         return imported
+    }
+
+    private func coordinatedDataRead(from url: URL) throws -> Data {
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinationError: NSError?
+        var readResult: Result<Data, Error>?
+
+        coordinator.coordinate(
+            readingItemAt: url,
+            options: [],
+            error: &coordinationError
+        ) { coordinatedURL in
+            do {
+                let data = try Data(
+                    contentsOf: coordinatedURL,
+                    options: [.mappedIfSafe]
+                )
+                readResult = .success(data)
+            } catch {
+                readResult = .failure(error)
+            }
+        }
+
+        if let coordinationError {
+            throw coordinationError
+        }
+
+        guard let readResult else {
+            throw NSError(
+                domain: "HyperDroid.CursorImport",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "The selected cursor file could not be read from the Files app."
+                ]
+            )
+        }
+
+        return try readResult.get()
     }
 
     func clearImportedPack() throws {
