@@ -150,6 +150,7 @@ struct HDStartMenuView: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .focused($searchFocused)
+            .hdCursor(.ibeam)
         }
         .padding(.horizontal, centered ? 14 : 10)
         .frame(height: centered ? 34 : 30)
@@ -261,6 +262,7 @@ struct HDStartMenuView: View {
                 )
             }
             .buttonStyle(.plain)
+            .hdCursor(.hand)
         }
         .padding(.horizontal, centered ? 46 : 24)
         .padding(.bottom, centered ? 12 : 8)
@@ -292,6 +294,7 @@ struct HDStartMenuView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
     }
 
     private var centeredRecommended: some View {
@@ -382,6 +385,7 @@ struct HDStartMenuView: View {
                 .frame(height: centered ? 50 : 42)
             }
             .buttonStyle(.plain)
+            .hdCursor(.hand)
 
             Spacer()
 
