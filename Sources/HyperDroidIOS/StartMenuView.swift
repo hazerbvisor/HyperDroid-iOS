@@ -6,6 +6,12 @@ struct HDStartMenuView: View {
 
     @Environment(\.colorScheme) private var scheme
     @State private var search = ""
+    @AppStorage("hd.startShowSearch") private var showSearch = true
+    @AppStorage("hd.startShowRecommended") private var showRecommended = true
+    @AppStorage("hd.startCompact") private var compact = false
+    @AppStorage("hd.accountName") private var accountName = "Name"
+    @AppStorage("hd.transparency") private var transparency = true
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var filtered: [HDAppEntry] {
@@ -14,15 +20,17 @@ struct HDStartMenuView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let height = min(metrics.startMaxHeight, max(metrics.startMinHeight, geo.size.height * 0.78))
+            let baseHeight = min(metrics.startMaxHeight, max(metrics.startMinHeight, geo.size.height * 0.78))
+            let height = compact ? max(360, baseHeight - 110) : baseHeight
+
             VStack(spacing: 0) {
-                header
+                if showSearch { header }
                 bodyContent
                 footer
             }
             .frame(maxWidth: .infinity)
             .frame(height: height)
-            .background(p.startMenu)
+            .background(p.startMenu.opacity(transparency ? 0.96 : 1.0))
             .clipShape(RoundedRectangle(cornerRadius: metrics.startRadius))
             .overlay(RoundedRectangle(cornerRadius: metrics.startRadius).stroke(p.border, lineWidth: 1))
             .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
@@ -61,27 +69,22 @@ struct HDStartMenuView: View {
                     .foregroundColor(p.text)
                 Spacer()
                 Button(action: {}) {
-                    HDImage(name: "menu_ic_reorder_12_regular", template: true, tint: p.text).frame(width: 12, height: 12)
+                    HDImage(name: "menu_ic_reorder_12_regular", template: true, tint: p.text)
+                        .frame(width: 12, height: 12)
                         .padding(.horizontal, 18)
                         .frame(height: 28)
-                }.buttonStyle(.plain)
-                Button(action: {}) {
-                    HStack(spacing: 10) {
-                        Text(". .").font(.system(size: 11.6))
-                        HDImage(name: "ic_arrow_down_12_regular", template: true, tint: p.text).frame(width: 12, height: 12)
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 28)
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(p.border.opacity(0.45), lineWidth: 1))
-                }.buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.leading, metrics.startTitlePaddingHorizontal)
-            .padding(.trailing, metrics.startTitlePaddingHorizontal)
-            .padding(.top, 18)
-            .padding(.vertical, 4)
+            .padding(.horizontal, metrics.startTitlePaddingHorizontal)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
 
             ScrollView(.vertical, showsIndicators: true) {
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(metrics.startAppWidth), spacing: 0), count: metrics.landscape ? 6 : 4), spacing: 0) {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.fixed(metrics.startAppWidth), spacing: 0), count: metrics.landscape ? 6 : 4),
+                    spacing: 0
+                ) {
                     ForEach(filtered) { app in
                         Button { onOpen(app) } label: {
                             VStack(spacing: 0) {
@@ -103,20 +106,24 @@ struct HDStartMenuView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .frame(height: metrics.startGridHeight)
+            .frame(height: compact ? max(150, metrics.startGridHeight - 70) : metrics.startGridHeight)
             .padding(.horizontal, metrics.startGridPaddingHorizontal)
             .padding(.top, 8)
 
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Recommended")
-                    .font(.system(size: metrics.startHeaderFontSize, weight: .bold))
-                Text("The more you use your device, we will show you new apps here.")
-                    .font(.system(size: 12.2))
-                    .foregroundColor(p.mutedText)
+            if showRecommended && !compact {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Recommended")
+                        .font(.system(size: metrics.startHeaderFontSize, weight: .bold))
+                    Text("The more you use your device, we will show you new apps here.")
+                        .font(.system(size: 12.2))
+                        .foregroundColor(p.mutedText)
+                }
+                .foregroundColor(p.text)
+                .padding(.horizontal, metrics.landscape ? 42 : 18)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                Spacer(minLength: 0)
             }
-            .foregroundColor(p.text)
-            .padding(.horizontal, metrics.landscape ? 42 : 18)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -125,18 +132,24 @@ struct HDStartMenuView: View {
             Button(action: {}) {
                 HStack(spacing: 12) {
                     HDImage(name: "img_user_default").frame(width: 24, height: 24).clipShape(Circle())
-                    Text("Name").font(.system(size: 12)).foregroundColor(p.text)
+                    Text(accountName.isEmpty ? "Name" : accountName)
+                        .font(.system(size: 12))
+                        .foregroundColor(p.text)
                 }
                 .padding(.horizontal, 10)
                 .frame(height: 42)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
+
             Spacer()
+
             Button(action: {}) {
                 HDImage(name: "ic_power_20_regular", template: true, tint: p.text)
                     .frame(width: 19, height: 19)
                     .padding(10)
                     .frame(height: 42)
-            }.buttonStyle(.plain)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, metrics.startBodyPaddingHorizontal)
         .padding(.vertical, metrics.startFooterPadding)
