@@ -13,35 +13,44 @@ struct HDTaskbarView: View {
     let onToggleCalendar: () -> Void
 
     @Environment(\.colorScheme) private var scheme
+    @AppStorage("hd.taskbarAlignment") private var alignment = "Center"
+    @AppStorage("hd.taskbarShowWidgets") private var showWidgets = true
+    @AppStorage("hd.taskbarShowClock") private var showClock = true
+    @AppStorage("hd.taskbarShowSeconds") private var showSeconds = false
+    @AppStorage("hd.use24Hour") private var use24Hour = false
+    @AppStorage("hd.transparency") private var transparency = true
+    @AppStorage("hd.accentColor") private var accentColor = "Blue"
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
         ZStack {
-            p.taskbar
+            p.taskbar.opacity(transparency ? 0.94 : 1.0)
 
             Rectangle()
                 .fill(p.border.opacity(0.65))
                 .frame(height: 1)
                 .frame(maxHeight: .infinity, alignment: .top)
 
-            // Left area is independent so it cannot push the app group off true center.
-            HStack(spacing: 0) {
-                Button(action: {}) {
-                    HDImage(name: "img_app_widget")
-                        .frame(width: metrics.taskbarAppSize, height: metrics.taskbarAppSize)
-                        .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
+            if showWidgets {
+                HStack(spacing: 0) {
+                    Button(action: {}) {
+                        HDImage(name: "img_app_widget")
+                            .frame(width: metrics.taskbarAppSize, height: metrics.taskbarAppSize)
+                            .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
                 }
-                .buttonStyle(.plain)
-                Spacer()
             }
 
-            // Windows 11 app group: centered against the full display width.
             HStack(spacing: 2) {
                 HDTaskbarIcon(
                     asset: "app_startmenu_btn",
                     iconSize: metrics.taskbarAppSize,
                     buttonSize: metrics.taskbarButtonSize,
                     active: startMenuVisible,
+                    accent: p.primary,
                     action: onToggleStart
                 )
 
@@ -51,7 +60,8 @@ struct HDTaskbarView: View {
                         asset: app.asset,
                         iconSize: metrics.taskbarAppSize,
                         buttonSize: metrics.taskbarButtonSize,
-                        active: open?.id == activeWindowID
+                        active: open?.id == activeWindowID,
+                        accent: p.primary
                     ) {
                         if let open {
                             onFocus(open.id)
@@ -61,9 +71,12 @@ struct HDTaskbarView: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(
+                maxWidth: .infinity,
+                alignment: alignment == "Left" ? .leading : .center
+            )
+            .padding(.leading, alignment == "Left" ? (showWidgets ? metrics.taskbarButtonSize + 4 : 4) : 0)
 
-            // System tray is also independent of the centered app group.
             HStack(spacing: 0) {
                 Spacer()
 
@@ -90,31 +103,44 @@ struct HDTaskbarView: View {
                 }
                 .buttonStyle(.plain)
 
-                Button(action: onToggleCalendar) {
-                    HStack(spacing: 5) {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            VStack(alignment: .trailing, spacing: -2) {
-                                Text(context.date, format: .dateTime.hour().minute())
-                                Text(context.date, format: .dateTime.day().month().year())
+                if showClock {
+                    Button(action: onToggleCalendar) {
+                        HStack(spacing: 5) {
+                            TimelineView(.periodic(from: .now, by: showSeconds ? 1 : 30)) { context in
+                                VStack(alignment: .trailing, spacing: -2) {
+                                    Text(clockText(context.date))
+                                    Text(context.date, format: .dateTime.day().month().year())
+                                }
+                                .font(.system(size: 9.5))
                             }
-                            .font(.system(size: 9.5))
-                        }
 
-                        HDImage(name: "ui_tb_alert_24_regular", template: true, tint: p.text)
-                            .frame(width: 15, height: 15)
+                            HDImage(name: "ui_tb_alert_24_regular", template: true, tint: p.text)
+                                .frame(width: 15, height: 15)
+                        }
+                        .padding(.leading, 6)
+                        .padding(.trailing, 7)
+                        .frame(height: metrics.taskbarHeight)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.leading, 6)
-                    .padding(.trailing, 7)
-                    .frame(height: metrics.taskbarHeight)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .foregroundColor(p.text)
         }
         .frame(height: metrics.taskbarHeight)
         .padding(.horizontal, metrics.taskbarMarginHorizontal)
         .padding(.bottom, metrics.taskbarMarginBottom)
+    }
+
+    private func clockText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        if use24Hour {
+            formatter.dateFormat = showSeconds ? "HH:mm:ss" : "HH:mm"
+        } else {
+            formatter.dateFormat = showSeconds ? "h:mm:ss a" : "h:mm a"
+        }
+        return formatter.string(from: date)
     }
 }
 
@@ -123,6 +149,7 @@ private struct HDTaskbarIcon: View {
     let iconSize: CGFloat
     let buttonSize: CGFloat
     let active: Bool
+    let accent: Color
     let action: () -> Void
 
     var body: some View {
@@ -133,7 +160,7 @@ private struct HDTaskbarIcon: View {
                     .frame(width: buttonSize, height: buttonSize)
 
                 Capsule()
-                    .fill(Color(red: 0.0, green: 0.47, blue: 0.84))
+                    .fill(accent)
                     .frame(width: active ? 16 : 0, height: 3)
                     .opacity(active ? 1 : 0)
                     .padding(.bottom, 2)
