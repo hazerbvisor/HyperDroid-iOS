@@ -2,105 +2,60 @@ import SwiftUI
 import WebKit
 import UIKit
 
+private enum HDBrowserDefaults {
+    static let homeURL = URL(string: "https://www.google.com")!
+    static let initialTabID = UUID()
+}
+
+private struct HDBrowserTab: Identifiable, Equatable {
+    let id: UUID
+    var title: String
+    var url: URL
+
+    init(id: UUID = UUID(), title: String = "New Tab", url: URL = HDBrowserDefaults.homeURL) {
+        self.id = id
+        self.title = title
+        self.url = url
+    }
+}
+
+private enum HDBrowserCommand: Equatable {
+    case none
+    case back
+    case forward
+    case reload
+}
+
 struct HDBrowserView: View {
     let onFocus: () -> Void
+    let onMinimize: () -> Void
     let onClose: () -> Void
     let onMaximize: () -> Void
     let onDragChanged: (CGSize) -> Void
     let onDragEnded: (CGSize) -> Void
 
     @Environment(\.colorScheme) private var scheme
-    @State private var address = "https://www.google.com"
-    @State private var currentURL = URL(string: "https://www.google.com")!
+    @State private var tabs: [HDBrowserTab] = [
+        HDBrowserTab(id: HDBrowserDefaults.initialTabID)
+    ]
+    @State private var selectedTabID = HDBrowserDefaults.initialTabID
+    @State private var address = HDBrowserDefaults.homeURL.absoluteString
     @State private var dragStarted = false
+    @State private var command: HDBrowserCommand = .none
+    @State private var commandSerial = 0
+
     @AppStorage("hd.webAccess") private var webAccess = true
     @AppStorage("hd.defaultBrowser") private var defaultBrowser = "HyperDroid Browser"
+
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        HStack(spacing: 8) {
-                            HDImage(name: "img_app_chrome").frame(width: 16, height: 16)
-                            Text("New Tab").font(.system(size: 12)).foregroundColor(p.text).lineLimit(1)
-                            Spacer(minLength: 4)
-                            Text("×").font(.system(size: 15)).foregroundColor(p.mutedText)
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(width: 180, height: 40)
-                        .background(p.dialogBody)
-                    }
-                }
-                .frame(maxWidth: 260)
-
-                Button(action: {}) {
-                    Text("+").font(.system(size: 20, weight: .light)).foregroundColor(p.text)
-                        .frame(width: 30, height: 30)
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 6)
-
-                Spacer(minLength: 0)
-                browserWindowControl("app_title_ic_minimize_15", action: onFocus)
-                browserWindowControl("app_title_ic_resize_15", action: onMaximize)
-                browserWindowControl("app_title_ic_close_16", danger: true, action: onClose)
-            }
-            .frame(height: 40)
-            .background(p.dialog)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1, coordinateSpace: .global)
-                    .onChanged { value in
-                        if !dragStarted {
-                            dragStarted = true
-                            onFocus()
-                        }
-                        onDragChanged(value.translation)
-                    }
-                    .onEnded { value in
-                        onDragEnded(value.translation)
-                        dragStarted = false
-                    }
-            )
-
-            HStack(spacing: 0) {
-                browserNav("‹", action: {})
-                browserNav("›", action: {})
-                browserNav("↻", action: reload)
-
-                HStack(spacing: 8) {
-                    Text("G").font(.system(size: 14, weight: .semibold)).foregroundColor(.blue)
-                    TextField("Search Google or type a URL", text: $address)
-                        .font(.system(size: 14))
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .submitLabel(.go)
-                        .onSubmit(loadAddress)
-                        .foregroundColor(p.text)
-                    Button(action: {}) {
-                        HDImage(name: "img_app_installer").frame(width: 18, height: 18)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 34)
-                .background(p.explorer)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay(RoundedRectangle(cornerRadius: 7).stroke(p.border.opacity(0.65), lineWidth: 1))
-                .padding(.horizontal, 6)
-
-                browserNav("↓", action: {})
-                browserNav("⋮", action: {})
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 8)
-            .background(p.dialogBody)
+            titleAndTabs
+            navigationBar
 
             if webAccess {
-                HDWebView(url: currentURL)
-                    .id(currentURL)
+                browserPages
             } else {
                 VStack(spacing: 10) {
                     Text("Network access is turned off")
@@ -115,9 +70,162 @@ struct HDBrowserView: View {
             }
         }
         .background(p.dialogBody)
+        .onChange(of: selectedURLString) { value in
+            address = value
+        }
     }
 
-    private func browserWindowControl(_ asset: String, danger: Bool = false, action: @escaping () -> Void) -> some View {
+    private var titleAndTabs: some View {
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    ForEach(tabs) { tab in
+                        Button {
+                            selectTab(tab.id)
+                        } label: {
+                            HStack(spacing: 7) {
+                                HDImage(name: "img_app_chrome")
+                                    .frame(width: 15, height: 15)
+
+                                Text(tab.title.isEmpty ? displayTitle(for: tab.url) : tab.title)
+                                    .font(.system(size: 11.5))
+                                    .foregroundColor(p.text)
+                                    .lineLimit(1)
+
+                                Spacer(minLength: 2)
+
+                                Button {
+                                    closeTab(tab.id)
+                                } label: {
+                                    Text("×")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(p.mutedText)
+                                        .frame(width: 20, height: 20)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.leading, 10)
+                            .padding(.trailing, 5)
+                            .frame(width: 160, height: 35)
+                            .background(
+                                selectedTabID == tab.id
+                                    ? p.dialogBody
+                                    : p.dialog.opacity(0.45)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.leading, 6)
+            }
+            .frame(maxWidth: 520)
+
+            Button(action: addTab) {
+                Text("+")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundColor(p.text)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 4)
+
+            Spacer(minLength: 0)
+
+            browserWindowControl("app_title_ic_minimize_15", action: onMinimize)
+            browserWindowControl("app_title_ic_resize_15", action: onMaximize)
+            browserWindowControl("app_title_ic_close_16", danger: true, action: onClose)
+        }
+        .frame(height: 40)
+        .background(p.dialog)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    if !dragStarted {
+                        dragStarted = true
+                        onFocus()
+                    }
+                    onDragChanged(value.translation)
+                }
+                .onEnded { value in
+                    onDragEnded(value.translation)
+                    dragStarted = false
+                }
+        )
+    }
+
+    private var navigationBar: some View {
+        HStack(spacing: 0) {
+            browserNav("‹") { send(.back) }
+            browserNav("›") { send(.forward) }
+            browserNav("↻") { send(.reload) }
+
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(p.mutedText)
+
+                TextField("Search Google or type a URL", text: $address)
+                    .font(.system(size: 13))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.go)
+                    .onSubmit(loadAddress)
+                    .foregroundColor(p.text)
+
+                Button(action: {}) {
+                    Image(systemName: "star")
+                        .font(.system(size: 13))
+                        .foregroundColor(p.mutedText)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 32)
+            .background(p.explorer)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(p.border.opacity(0.60), lineWidth: 1))
+            .padding(.horizontal, 6)
+
+            browserNav("↓", action: {})
+            browserNav("⋮", action: {})
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 7)
+        .background(p.dialogBody)
+    }
+
+    private var browserPages: some View {
+        ZStack {
+            ForEach(tabs) { tab in
+                if let index = tabs.firstIndex(where: { $0.id == tab.id }) {
+                    HDWebView(
+                        url: $tabs[index].url,
+                        title: $tabs[index].title,
+                        isActive: selectedTabID == tab.id,
+                        command: command,
+                        commandSerial: commandSerial
+                    )
+                    .opacity(selectedTabID == tab.id ? 1 : 0)
+                    .allowsHitTesting(selectedTabID == tab.id)
+                    .accessibilityHidden(selectedTabID != tab.id)
+                }
+            }
+        }
+        .background(Color.white)
+    }
+
+    private var selectedURLString: String {
+        tabs.first(where: { $0.id == selectedTabID })?.url.absoluteString
+            ?? HDBrowserDefaults.homeURL.absoluteString
+    }
+
+    private func browserWindowControl(
+        _ asset: String,
+        danger: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HDImage(name: asset, template: true, tint: p.text)
                 .frame(width: 15, height: 15)
@@ -129,9 +237,47 @@ struct HDBrowserView: View {
 
     private func browserNav(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(label).font(.system(size: 18)).foregroundColor(p.text).frame(width: 34, height: 34)
+            Text(label)
+                .font(.system(size: 18))
+                .foregroundColor(p.text)
+                .frame(width: 34, height: 32)
         }
         .buttonStyle(.plain)
+    }
+
+    private func addTab() {
+        let tab = HDBrowserTab()
+        tabs.append(tab)
+        selectedTabID = tab.id
+        address = tab.url.absoluteString
+    }
+
+    private func selectTab(_ id: UUID) {
+        selectedTabID = id
+        if let tab = tabs.first(where: { $0.id == id }) {
+            address = tab.url.absoluteString
+        }
+    }
+
+    private func closeTab(_ id: UUID) {
+        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+
+        if tabs.count == 1 {
+            tabs[0].url = HDBrowserDefaults.homeURL
+            tabs[0].title = "New Tab"
+            selectedTabID = tabs[0].id
+            address = HDBrowserDefaults.homeURL.absoluteString
+            return
+        }
+
+        let wasSelected = selectedTabID == id
+        tabs.remove(at: index)
+
+        if wasSelected {
+            let newIndex = min(index, tabs.count - 1)
+            selectedTabID = tabs[newIndex].id
+            address = tabs[newIndex].url.absoluteString
+        }
     }
 
     private func loadAddress() {
@@ -144,37 +290,100 @@ struct HDBrowserView: View {
                 value = "https://www.google.com/search?q=" + q
             }
         }
-        if let url = URL(string: value) {
-            address = value
-            if defaultBrowser == "External browser" {
-                UIApplication.shared.open(url)
-            } else {
-                currentURL = url
-            }
+
+        guard let url = URL(string: value) else { return }
+
+        if defaultBrowser == "External browser" {
+            UIApplication.shared.open(url)
+            return
         }
+
+        guard let index = tabs.firstIndex(where: { $0.id == selectedTabID }) else { return }
+        tabs[index].url = url
+        address = url.absoluteString
     }
 
-    private func reload() {
-        currentURL = URL(string: currentURL.absoluteString + (currentURL.query == nil ? "?" : "&") + "_hdreload=1") ?? currentURL
+    private func send(_ value: HDBrowserCommand) {
+        command = value
+        commandSerial += 1
+    }
+
+    private func displayTitle(for url: URL) -> String {
+        if url == HDBrowserDefaults.homeURL { return "New Tab" }
+        return url.host?.replacingOccurrences(of: "www.", with: "") ?? "Tab"
     }
 }
 
 struct HDWebView: UIViewRepresentable {
-    let url: URL
+    @Binding var url: URL
+    @Binding var title: String
+
+    let isActive: Bool
+    let command: HDBrowserCommand
+    let commandSerial: Int
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.defaultWebpagePreferences.allowsContentJavaScript = true
+        config.defaultWebpagePreferences.preferredContentMode = .desktop
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.preferences.isElementFullscreenEnabled = true
+        config.allowsInlineMediaPlayback = true
+        config.allowsPictureInPictureMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+
         let view = WKWebView(frame: .zero, configuration: config)
+        view.navigationDelegate = context.coordinator
         view.allowsBackForwardNavigationGestures = true
         view.scrollView.keyboardDismissMode = .interactive
+        view.scrollView.contentInsetAdjustmentBehavior = .never
         view.load(URLRequest(url: url))
         return view
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        if uiView.url?.absoluteString != url.absoluteString {
+        context.coordinator.parent = self
+
+        if uiView.url?.absoluteString != url.absoluteString && !uiView.isLoading {
             uiView.load(URLRequest(url: url))
+        }
+
+        if isActive && commandSerial != context.coordinator.lastCommandSerial {
+            switch command {
+            case .back:
+                if uiView.canGoBack { uiView.goBack() }
+            case .forward:
+                if uiView.canGoForward { uiView.goForward() }
+            case .reload:
+                uiView.reload()
+            case .none:
+                break
+            }
+            context.coordinator.lastCommandSerial = commandSerial
+        }
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var parent: HDWebView
+        var lastCommandSerial = 0
+
+        init(_ parent: HDWebView) {
+            self.parent = parent
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            if let currentURL = webView.url, parent.url != currentURL {
+                parent.url = currentURL
+            }
+
+            let webTitle = webView.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !webTitle.isEmpty && parent.title != webTitle {
+                parent.title = webTitle
+            }
         }
     }
 }
