@@ -4,6 +4,7 @@ struct HDSettingsView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var page = "Personalize"
     @State private var updateMessage = ""
+    @AppStorage("hd.settingsRequestedPage") private var requestedPage = "Personalize"
 
     @AppStorage("hd.theme") private var theme = "Dark"
     @AppStorage("hd.transparency") private var transparency = true
@@ -82,6 +83,16 @@ struct HDSettingsView: View {
                     .frame(width: geo.size.width * 0.75)
             }
         }
+        .onAppear {
+            if pages.contains(requestedPage) {
+                page = requestedPage
+            }
+        }
+        .onChange(of: requestedPage) { value in
+            if pages.contains(value) {
+                page = value
+            }
+        }
     }
 
     private var navigation: some View {
@@ -111,6 +122,7 @@ struct HDSettingsView: View {
                         Button {
                             withAnimation(.easeOut(duration: 0.14)) {
                                 page = item
+                                requestedPage = item
                             }
                         } label: {
                             HStack(spacing: 10) {
