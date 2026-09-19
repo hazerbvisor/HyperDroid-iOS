@@ -99,10 +99,20 @@ struct DesktopView: View {
                 }
 
                 if moreIconsVisible {
-                    HDMoreIconsPanelView {
-                        dismissPopups(animated: true)
-                        open(.installer, in: geo.size, metrics: metrics)
-                    }
+                    HDMoreIconsPanelView(
+                        onOpenSecurity: {
+                            dismissPopups(animated: true)
+                            openSettings("Privacy & security", in: geo.size, metrics: metrics)
+                        },
+                        onOpenDevices: {
+                            dismissPopups(animated: true)
+                            openSettings("Bluetooth & devices", in: geo.size, metrics: metrics)
+                        },
+                        onOpenInstaller: {
+                            dismissPopups(animated: true)
+                            open(.installer, in: geo.size, metrics: metrics)
+                        }
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                     .padding(.trailing, 190)
                     .padding(.bottom, metrics.taskbarHeight + 6)
@@ -267,6 +277,11 @@ struct DesktopView: View {
         .padding(.top, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.bottom, metrics.taskbarHeight)
+    }
+
+    private func openSettings(_ page: String, in size: CGSize, metrics: HDMetrics) {
+        UserDefaults.standard.set(page, forKey: "hd.settingsRequestedPage")
+        controller.open(.settings, desktop: size, taskbarHeight: metrics.taskbarHeight)
     }
 
     private func open(_ kind: HDAppEntry.Kind, in size: CGSize, metrics: HDMetrics) {
