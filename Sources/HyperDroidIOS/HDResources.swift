@@ -63,18 +63,21 @@ enum HDAsset {
     }()
 
     static func uiImage(_ name: String, template: Bool = false) -> UIImage? {
-        guard let atlas, let rect = HDAtlas.rects[name], let cg = atlas.cgImage else { return nil }
-        let scaleX = CGFloat(cg.width) / atlas.size.width
-        let scaleY = CGFloat(cg.height) / atlas.size.height
-        let pixelRect = CGRect(
-            x: rect.origin.x * scaleX,
-            y: rect.origin.y * scaleY,
-            width: rect.size.width * scaleX,
-            height: rect.size.height * scaleY
-        ).integral
-        guard let cropped = cg.cropping(to: pixelRect) else { return nil }
-        let image = UIImage(cgImage: cropped, scale: atlas.scale, orientation: .up)
-        return template ? image.withRenderingMode(.alwaysTemplate) : image
+        if let atlas, let rect = HDAtlas.rects[name], let cg = atlas.cgImage {
+            let scaleX = CGFloat(cg.width) / atlas.size.width
+            let scaleY = CGFloat(cg.height) / atlas.size.height
+            let pixelRect = CGRect(
+                x: rect.origin.x * scaleX,
+                y: rect.origin.y * scaleY,
+                width: rect.size.width * scaleX,
+                height: rect.size.height * scaleY
+            ).integral
+            if let cropped = cg.cropping(to: pixelRect) {
+                let image = UIImage(cgImage: cropped, scale: atlas.scale, orientation: .up)
+                return template ? image.withRenderingMode(.alwaysTemplate) : image
+            }
+        }
+        return HDExtraAssets.image(name, template: template)
     }
 }
 
