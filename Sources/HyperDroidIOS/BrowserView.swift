@@ -204,7 +204,10 @@ struct HDBrowserView: View {
                         title: $tabs[index].title,
                         isActive: selectedTabID == tab.id,
                         command: command,
-                        commandSerial: commandSerial
+                        commandSerial: commandSerial,
+                        onOpenNewTab: { url in
+                            openTab(url)
+                        }
                     )
                     .opacity(selectedTabID == tab.id ? 1 : 0)
                     .allowsHitTesting(selectedTabID == tab.id)
@@ -245,10 +248,17 @@ struct HDBrowserView: View {
     }
 
     private func addTab() {
-        let tab = HDBrowserTab()
+        openTab(HDBrowserDefaults.homeURL)
+    }
+
+    private func openTab(_ url: URL) {
+        let tab = HDBrowserTab(
+            title: url == HDBrowserDefaults.homeURL ? "New Tab" : displayTitle(for: url),
+            url: url
+        )
         tabs.append(tab)
         selectedTabID = tab.id
-        address = tab.url.absoluteString
+        address = url.absoluteString
     }
 
     private func selectTab(_ id: UUID) {
@@ -320,6 +330,7 @@ private struct HDWebView: UIViewRepresentable {
     let isActive: Bool
     let command: HDBrowserCommand
     let commandSerial: Int
+    let onOpenNewTab: (URL) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -393,8 +404,11 @@ private struct HDWebView: UIViewRepresentable {
             for navigationAction: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
+            if navigationAction.targetFrame == nil,
+               let url = navigationAction.request.url {
+                DispatchQueue.main.async {
+                    self.parent.onOpenNewTab(url)
+                }
             }
             return nil
         }
