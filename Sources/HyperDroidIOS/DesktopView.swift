@@ -5,12 +5,14 @@ struct DesktopView: View {
     @State private var actionCenterVisible = false
     @State private var calendarVisible = false
     @State private var moreIconsVisible = false
+    @State private var searchVisible = false
     @State private var taskbarPeek = false
     @Environment(\.colorScheme) private var scheme
     @AppStorage("hd.theme") private var theme = "Dark"
     @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Black"
     @AppStorage("hd.nightLight") private var nightLight = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
+    @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
 
     var body: some View {
         GeometryReader { geo in
@@ -22,6 +24,7 @@ struct DesktopView: View {
                 && !actionCenterVisible
                 && !calendarVisible
                 && !moreIconsVisible
+                && !searchVisible
 
             ZStack(alignment: .bottom) {
                 desktopBackground.ignoresSafeArea()
@@ -62,7 +65,7 @@ struct DesktopView: View {
                     )
                 }
 
-                if controller.startMenuVisible || actionCenterVisible || calendarVisible || moreIconsVisible {
+                if controller.startMenuVisible || actionCenterVisible || calendarVisible || moreIconsVisible || searchVisible {
                     Color.black.opacity(0.001)
                         .contentShape(Rectangle())
                         .onTapGesture { dismissPopups(animated: true) }
@@ -76,6 +79,23 @@ struct DesktopView: View {
                     .padding(.bottom, metrics.startMarginBottom)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(10000)
+                }
+
+
+                if searchVisible {
+                    HDSearchPanelView { app in
+                        dismissPopups(animated: true)
+                        open(app.kind, in: geo.size, metrics: metrics)
+                    }
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: taskbarAlignment == "Left" ? .bottomLeading : .bottom
+                    )
+                    .padding(.leading, taskbarAlignment == "Left" ? 8 : 0)
+                    .padding(.bottom, metrics.taskbarHeight + 6)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(10010)
                 }
 
                 if moreIconsVisible {
@@ -124,9 +144,10 @@ struct DesktopView: View {
                         }
                     },
                     onSearch: {
+                        let next = !searchVisible
                         dismissPopups(animated: false)
                         withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) {
-                            controller.startMenuVisible = true
+                            searchVisible = next
                         }
                     },
                     onOpen: { open($0, in: geo.size, metrics: metrics) },
@@ -170,7 +191,7 @@ struct DesktopView: View {
                         .zIndex(21000)
                 }
             }
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container, edges: .all)
         }
         .preferredColorScheme(preferredScheme)
     }
@@ -208,6 +229,7 @@ struct DesktopView: View {
             actionCenterVisible = false
             calendarVisible = false
             moreIconsVisible = false
+            searchVisible = false
         }
 
         if animated {
