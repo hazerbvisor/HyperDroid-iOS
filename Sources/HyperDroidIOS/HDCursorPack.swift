@@ -160,7 +160,7 @@ final class HDCursorPackManager: ObservableObject {
             let isPNG = payload.count >= 8
                 && Array(payload.prefix(8)) == [137, 80, 78, 71, 13, 10, 26, 10]
 
-            if let image = UIImage(data: payload) {
+            if let image = decodeCursorImage(payload) {
                 candidates.append((
                     Entry(
                         width: width,
@@ -205,6 +205,124 @@ final class HDCursorPackManager: ObservableObject {
                 height: selected.entry.height
             )
         )
+    }
+
+    private static func decodeCursorImage(_ payload: Data) -> UIImage? {
+        if let image = UIImage(data: payload) {
+            return image
+        }
+        return decodeDIB(payload)
+    }
+
+    private static func decodeDIB(_ data: Data) -> UIImage? {
+        guard data.count >= 40 else { return nil }
+
+        let headerSize = Int(readUInt32(data, 0))
+        let widthValue = Int32(bitPattern: readUInt32(data, 4))
+        let heightValue = Int32(bitPattern: readUInt32(data, 8))
+        let planes = readUInt16(data, 12)
+        let bitsPerPixel = readUInt16(data, 14)
+        let compression = readUInt32(data, 16)
+
+        guard headerSize >= 40,
+              widthValue > 0,
+              heightValue != 0,
+              planes == 1,
+              bitsPerPixel == 32,
+              compression == 0 else {
+            return nil
+        }
+
+        let width = Int(widthValue)
+        let storedHeight = abs(Int(heightValue))
+        let height = storedHeight / 2
+        guard width > 0, height > 0 else { return nil }
+
+        let pixelOffset = headerSize
+        let rowBytes = width * 4
+        let xorByteCount = rowBytes * height
+        guard pixelOffset + xorByteCount <= data.count else { return nil }
+
+        let maskRowBytes = ((width + 31) / 32) * 4
+        let maskOffset = pixelOffset + xorByteCount
+        let hasMask = maskOffset + (maskRowBytes * height) <= data.count
+        let topDown = heightValue < 0
+
+        var rgba = Data(count: width * height * 4)
+        var sawAlpha = false
+
+        rgba.withUnsafeMutableBytes { destinationRaw in
+            data.withUnsafeBytes { sourceRaw in
+                let destination = destinationRaw.bindMemory(to: UInt8.self)
+                let source = sourceRaw.bindMemory(to: UInt8.self)
+
+                for y in 0..<height {
+                    let sourceY = topDown ? y : (height - 1 - y)
+
+                    for x in 0..<width {
+                        let sourceIndex = pixelOffset + (sourceY * rowBytes) + (x * 4)
+                        let destinationIndex = ((y * width) + x) * 4
+
+                        let blue = source[sourceIndex]
+                        let green = source[sourceIndex + 1]
+                        let red = source[sourceIndex + 2]
+                        let alpha = source[sourceIndex + 3]
+
+                        if alpha != 0 {
+                            sawAlpha = true
+                        }
+
+                        destination[destinationIndex] = red
+                        destination[destinationIndex + 1] = green
+                        destination[destinationIndex + 2] = blue
+                        destination[destinationIndex + 3] = alpha
+                    }
+                }
+            }
+        }
+
+        if !sawAlpha && hasMask {
+            rgba.withUnsafeMutableBytes { destinationRaw in
+                data.withUnsafeBytes { sourceRaw in
+                    let destination = destinationRaw.bindMemory(to: UInt8.self)
+                    let source = sourceRaw.bindMemory(to: UInt8.self)
+
+                    for y in 0..<height {
+                        let sourceY = topDown ? y : (height - 1 - y)
+                        let maskRow = maskOffset + (sourceY * maskRowBytes)
+
+                        for x in 0..<width {
+                            let byte = source[maskRow + (x / 8)]
+                            let bit = (byte >> UInt8(7 - (x % 8))) & 1
+                            let destinationIndex = ((y * width) + x) * 4
+                            destination[destinationIndex + 3] = bit == 0 ? 255 : 0
+                        }
+                    }
+                }
+            }
+        }
+
+        guard let provider = CGDataProvider(data: rgba as CFData) else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue)
+
+        guard let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: true,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+
+        return UIImage(cgImage: cgImage)
     }
 
     private static func readUInt16(_ data: Data, _ offset: Int) -> UInt16 {
