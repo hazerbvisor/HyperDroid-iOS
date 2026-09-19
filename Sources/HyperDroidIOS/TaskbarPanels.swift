@@ -3,8 +3,12 @@ import SwiftUI
 struct HDActionCenterView: View {
     let onOpenSettings: () -> Void
     @Environment(\.colorScheme) private var scheme
-    @State private var volume = 0.50
-    @State private var enabled: Set<String> = ["Wi-Fi", "Internet", "Bluetooth"]
+    @AppStorage("hd.volume") private var volume = 0.50
+    @AppStorage("hd.bluetooth") private var bluetooth = true
+    @AppStorage("hd.nearbySharing") private var nearbySharing = true
+    @AppStorage("hd.webAccess") private var webAccess = true
+    @AppStorage("hd.theme") private var theme = "Dark"
+    @State private var accessibility = false
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     private let items: [(String, String)] = [
@@ -22,13 +26,13 @@ struct HDActionCenterView: View {
                 ForEach(items, id: \.0) { item in
                     VStack(spacing: 6) {
                         Button {
-                            if enabled.contains(item.0) { enabled.remove(item.0) } else { enabled.insert(item.0) }
+                            toggle(item.0)
                         } label: {
-                            HDImage(name: item.1, template: true, tint: enabled.contains(item.0) ? .white : p.text)
+                            HDImage(name: item.1, template: true, tint: isEnabled(item.0) ? .white : p.text)
                                 .frame(width: 20, height: 20)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(enabled.contains(item.0) ? p.primary : p.dialogBody)
+                                .background(isEnabled(item.0) ? p.primary : p.dialogBody)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
                                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(p.border.opacity(0.45), lineWidth: 1))
                         }
@@ -76,6 +80,28 @@ struct HDActionCenterView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border, lineWidth: 1))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+    }
+
+    private func isEnabled(_ item: String) -> Bool {
+        switch item {
+        case "Wi-Fi", "Internet": return webAccess
+        case "Bluetooth": return bluetooth
+        case "Nearby sharing": return nearbySharing
+        case "Theme": return theme == "Dark"
+        case "Accessibility": return accessibility
+        default: return false
+        }
+    }
+
+    private func toggle(_ item: String) {
+        switch item {
+        case "Wi-Fi", "Internet": webAccess.toggle()
+        case "Bluetooth": bluetooth.toggle()
+        case "Nearby sharing": nearbySharing.toggle()
+        case "Theme": theme = theme == "Dark" ? "Light" : "Dark"
+        case "Accessibility": accessibility.toggle()
+        default: break
+        }
     }
 }
 
