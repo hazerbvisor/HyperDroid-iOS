@@ -71,15 +71,15 @@ final class HDCursorPackManager: ObservableObject {
             let name = url.lastPathComponent.lowercased()
             guard supported.contains(name) else { continue }
 
-            let scoped = url.startAccessingSecurityScopedResource()
+            let secured = url.startAccessingSecurityScopedResource()
             defer {
-                if scoped {
+                if secured {
                     url.stopAccessingSecurityScopedResource()
                 }
             }
 
             do {
-                let data = try coordinatedDataRead(from: url)
+                let data = try Data(contentsOf: url)
 
                 guard data.count >= 6,
                       Self.readUInt16(data, 0) == 0,
@@ -111,45 +111,6 @@ final class HDCursorPackManager: ObservableObject {
         }
 
         return imported
-    }
-
-    private func coordinatedDataRead(from url: URL) throws -> Data {
-        let coordinator = NSFileCoordinator(filePresenter: nil)
-        var coordinationError: NSError?
-        var readResult: Result<Data, Error>?
-
-        coordinator.coordinate(
-            readingItemAt: url,
-            options: [],
-            error: &coordinationError
-        ) { coordinatedURL in
-            do {
-                let data = try Data(
-                    contentsOf: coordinatedURL,
-                    options: [.mappedIfSafe]
-                )
-                readResult = .success(data)
-            } catch {
-                readResult = .failure(error)
-            }
-        }
-
-        if let coordinationError {
-            throw coordinationError
-        }
-
-        guard let readResult else {
-            throw NSError(
-                domain: "HyperDroid.CursorImport",
-                code: 1,
-                userInfo: [
-                    NSLocalizedDescriptionKey:
-                        "The selected cursor file could not be read from the Files app."
-                ]
-            )
-        }
-
-        return try readResult.get()
     }
 
     func clearImportedPack() throws {
