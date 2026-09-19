@@ -58,11 +58,10 @@ extension Color {
 
 enum HDAsset {
     private static let atlas: UIImage? = {
-        let encoded = HDAtlasData.value
-        let paddingCount = (4 - (encoded.count % 4)) % 4
-        let padded = encoded + String(repeating: "=", count: paddingCount)
-        guard let data = Data(base64Encoded: padded) else { return nil }
-        return UIImage(data: data)
+        guard let url = Bundle.main.url(forResource: "hyperdroid_ui_atlas", withExtension: "png") else {
+            return nil
+        }
+        return UIImage(contentsOfFile: url.path)
     }()
 
     static func uiImage(_ name: String, template: Bool = false) -> UIImage? {
