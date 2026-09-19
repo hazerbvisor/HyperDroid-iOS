@@ -5,14 +5,32 @@ struct DesktopView: View {
     @State private var actionCenterVisible = false
     @State private var calendarVisible = false
     @State private var moreIconsVisible = false
+    @State private var taskbarPeek = false
     @Environment(\.colorScheme) private var scheme
+    @AppStorage("hd.theme") private var theme = "Dark"
+    @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Black"
+    @AppStorage("hd.nightLight") private var nightLight = false
+    @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
 
     var body: some View {
         GeometryReader { geo in
             let metrics = HDMetrics.forSize(geo.size)
+            let shouldHideTaskbar = taskbarAutoHide
+                && controller.activeWindowID != nil
+                && !taskbarPeek
+                && !controller.startMenuVisible
+                && !actionCenterVisible
+                && !calendarVisible
+                && !moreIconsVisible
 
             ZStack(alignment: .bottom) {
-                Color.black.ignoresSafeArea()
+                desktopBackground.ignoresSafeArea()
+
+                if nightLight {
+                    Color.orange.opacity(0.08)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
 
                 desktopIcons(geo.size, metrics)
 
@@ -128,9 +146,52 @@ struct DesktopView: View {
                         }
                     }
                 )
+                .offset(y: shouldHideTaskbar ? metrics.taskbarHeight - 3 : 0)
+                .animation(.easeOut(duration: 0.18), value: shouldHideTaskbar)
                 .zIndex(20000)
+
+                if shouldHideTaskbar {
+                    Color.clear
+                        .frame(height: 14)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                taskbarPeek = true
+                            }
+                        }
+                        .zIndex(21000)
+                }
             }
             .ignoresSafeArea()
+        }
+        .preferredColorScheme(preferredScheme)
+    }
+
+    private var preferredScheme: ColorScheme? {
+        switch theme {
+        case "Light": return .light
+        case "System": return nil
+        default: return .dark
+        }
+    }
+
+    @ViewBuilder
+    private var desktopBackground: some View {
+        switch backgroundStyle {
+        case "Windows Blue":
+            Color(red: 0.02, green: 0.20, blue: 0.42)
+        case "Gradient":
+            LinearGradient(
+                colors: [
+                    Color(red: 0.02, green: 0.08, blue: 0.18),
+                    Color(red: 0.03, green: 0.34, blue: 0.58)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        default:
+            Color.black
         }
     }
 
