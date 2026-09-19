@@ -7,6 +7,7 @@ struct HDSettingsView: View {
     @State private var updateMessage = ""
     @State private var cursorImportMessage = ""
     @State private var cursorImportAlertPresented = false
+    @State private var cursorInstallBusy = false
     @ObservedObject private var cursorPack = HDCursorPackManager.shared
     @AppStorage("hd.settingsRequestedPage") private var requestedPage = "Personalize"
 
@@ -40,6 +41,7 @@ struct HDSettingsView: View {
     @AppStorage("hd.pointerSpeed") private var pointerSpeed = 0.50
     @AppStorage("hd.naturalScrolling") private var naturalScrolling = true
     @AppStorage("hd.cursorStyle") private var cursorStyle = "iPadOS"
+    @AppStorage("hd.cursorPackVariant") private var cursorPackVariant = "Light"
 
     @AppStorage("hd.defaultBrowser") private var defaultBrowser = "HyperDroid Browser"
     @AppStorage("hd.allowBackgroundApps") private var allowBackgroundApps = true
@@ -258,51 +260,59 @@ struct HDSettingsView: View {
                     value: $naturalScrolling
                 )
 
+                pickerRow(
+                    "Cursor pack",
+                    subtitle: "Choose which jepriCreations Windows 11 cursor variant to install",
+                    selection: $cursorPackVariant,
+                    values: ["Light", "Dark"]
+                )
+
                 infoRow(
                     "Windows 11 cursor pack",
-                    value: cursorPack.hasUsablePack
-                        ? "\(cursorPack.installedCount)/\(HDCursorKind.allCases.count) cursors"
-                        : "Not imported"
+                    value: cursorInstallBusy
+                        ? "Installing…"
+                        : (cursorPack.hasUsablePack
+                            ? "\(cursorPack.installedCount)/\(HDCursorKind.allCases.count) cursors"
+                            : "Not installed")
                 )
             }
 
             actionRow(
-                "Download Windows 11 cursor pack",
-                subtitle: "Open the jepriCreations-compatible cursor repository"
+                cursorPack.hasUsablePack
+                    ? "Reinstall Windows 11 cursors"
+                    : "Install Windows 11 cursors",
+                subtitle: "Download the selected cursor set directly from the source repository"
             ) {
-                if let url = URL(string: "https://github.com/SullensCR/Windows-11-Hdpi-Tail-Cursor-Concept-by-jepriCreations") {
-                    UIApplication.shared.open(url)
+                guard !cursorInstallBusy else { return }
+
+                cursorInstallBusy = true
+                cursorImportMessage = "Downloading \(cursorPackVariant.lowercased()) Windows 11 cursors…"
+
+                Task {
+                    do {
+                        let installed = try await cursorPack.installFromSource(
+                            variant: cursorPackVariant
+                        )
+
+                        cursorStyle = "Windows 11"
+                        cursorImportMessage =
+                            "Installed \(installed) Windows 11 cursor files. Windows 11 cursor mode is now active."
+                    } catch {
+                        cursorImportMessage =
+                            "Cursor install failed: \(error.localizedDescription)"
+                    }
+
+                    cursorInstallBusy = false
+                    cursorImportAlertPresented = true
                 }
             }
 
             actionRow(
-                "Import .cur files",
-                subtitle: "Select arrow.cur, hand.cur, ibeam.cur and the resize cursors from the extracted pack"
+                "View cursor source",
+                subtitle: "Open the cursor repository and attribution"
             ) {
-                HDCursorImportManager.shared.present { result in
-                    switch result {
-                    case .success(let imported):
-                        cursorPack.reload()
-                        if cursorPack.hasUsablePack {
-                            cursorStyle = "Windows 11"
-                        }
-
-                        if imported > 0 {
-                            let arrowNote = cursorPack.hasUsablePack
-                                ? " Windows 11 cursor mode is now active."
-                                : " Import arrow.cur as well to activate Windows 11 cursor mode."
-                            cursorImportMessage =
-                                "Imported \(imported) cursor file\(imported == 1 ? "" : "s")." + arrowNote
-                        } else {
-                            cursorImportMessage =
-                                "No supported .cur files were imported. Select the files directly from cursor/assets/light or cursor/assets/dark."
-                        }
-
-                    case .failure(let error):
-                        cursorImportMessage = "Import failed: \(error.localizedDescription)"
-                    }
-
-                    cursorImportAlertPresented = true
+                if let url = URL(string: "https://github.com/SullensCR/Windows-11-Hdpi-Tail-Cursor-Concept-by-jepriCreations") {
+                    UIApplication.shared.open(url)
                 }
             }
 
