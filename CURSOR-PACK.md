@@ -15,33 +15,12 @@ The source pack's `Agreement.txt` permits personal use and modification for pers
 
 Instead, HyperDroid can import the cursor files locally into its own Application Support directory.
 
-## Importing on iPad
+## Installing on iPad
 
-1. Open the cursor-pack repository in Safari.
-2. Download the repository ZIP.
-3. Extract it in the Files app.
-4. Open HyperDroid → Settings → Bluetooth & devices → Mouse.
-5. Tap **Import .cur files**.
-6. Select the files from either `cursor/assets/light` or `cursor/assets/dark`.
+Open HyperDroid → Settings → Bluetooth & devices → Mouse, choose **Light** or **Dark**, then tap **Install Windows 11 cursors**.
 
-Recommended files:
+HyperDroid downloads the static `.cur` files directly from the source repository into its private Application Support directory. The files are not bundled in the IPA and are not committed to this repository.
 
-- `arrow.cur`
-- `hand.cur`
-- `ibeam.cur`
-- `sizewe.cur`
-- `sizens.cur`
-- `sizenwse.cur`
-- `sizenesw.cur`
-- `sizeall.cur`
-- `no.cur`
-- `help.cur`
-- `crosshair.cur`
-- `uparrow.cur`
-- `nwpen.cur`
-- `person.cur`
-- `pin.cur`
+HyperDroid parses the native Windows CUR directory, preserves cursor hotspots, and decodes the 32-bit DIB frames used by this pack. If a specialized cursor is unavailable, HyperDroid falls back to the installed arrow cursor.
 
-HyperDroid parses the native Windows CUR directory, preserves cursor hotspots, and decodes the 32-bit DIB frames used by this pack. If a specialized cursor was not imported, HyperDroid falls back to the imported arrow cursor.
-
-Animated `.ani` busy cursors are intentionally not imported in this phase.
+Animated `.ani` busy cursors are intentionally not installed in this phase.
