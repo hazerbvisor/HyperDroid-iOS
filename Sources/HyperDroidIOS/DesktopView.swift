@@ -34,13 +34,14 @@ struct DesktopView: View {
 
                 desktopIcons(geo.size, metrics)
 
-                ForEach(controller.windows.sorted(by: { $0.z < $1.z })) { window in
+                ForEach(controller.windows.filter { !$0.minimized }.sorted(by: { $0.z < $1.z })) { window in
                     HDWindowView(
                         state: window,
                         desktopSize: geo.size,
                         taskbarHeight: metrics.taskbarHeight,
                         active: controller.activeWindowID == window.id,
                         onFocus: { controller.focus(window.id) },
+                        onMinimize: { controller.minimize(window.id) },
                         onClose: { controller.close(window.id) },
                         onMove: {
                             controller.move(
@@ -56,7 +57,7 @@ struct DesktopView: View {
                     .transition(
                         .asymmetric(
                             insertion: .scale(scale: 0.94).combined(with: .opacity),
-                            removal: .scale(scale: 0.97).combined(with: .opacity)
+                            removal: .move(edge: .bottom).combined(with: .scale(scale: 0.86)).combined(with: .opacity)
                         )
                     )
                 }
@@ -122,8 +123,14 @@ struct DesktopView: View {
                             controller.startMenuVisible = next
                         }
                     },
+                    onSearch: {
+                        dismissPopups(animated: false)
+                        withAnimation(.spring(response: 0.26, dampingFraction: 0.88)) {
+                            controller.startMenuVisible = true
+                        }
+                    },
                     onOpen: { open($0, in: geo.size, metrics: metrics) },
-                    onFocus: { controller.focus($0) },
+                    onWindowAction: { controller.taskbarAction($0) },
                     onToggleMore: {
                         let next = !moreIconsVisible
                         dismissPopups(animated: false)
@@ -263,6 +270,7 @@ private struct HDWindowView: View {
     let taskbarHeight: CGFloat
     let active: Bool
     let onFocus: () -> Void
+    let onMinimize: () -> Void
     let onClose: () -> Void
     let onMove: (CGSize) -> Void
     let onMaximize: () -> Void
@@ -290,6 +298,7 @@ private struct HDWindowView: View {
             if state.kind == .chrome {
                 HDBrowserView(
                     onFocus: onFocus,
+                    onMinimize: onMinimize,
                     onClose: onClose,
                     onMaximize: onMaximize,
                     onDragChanged: { value in
@@ -346,7 +355,7 @@ private struct HDWindowView: View {
 
             Spacer(minLength: 0)
 
-            titleButton("app_title_ic_minimize_15", action: onFocus)
+            titleButton("app_title_ic_minimize_15", action: onMinimize)
             titleButton("app_title_ic_resize_15", action: onMaximize)
             titleButton("app_title_ic_close_16", danger: true, action: onClose)
         }
