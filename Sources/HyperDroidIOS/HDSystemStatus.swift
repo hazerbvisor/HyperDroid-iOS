@@ -40,7 +40,6 @@ final class HDSystemStatus: ObservableObject, @unchecked Sendable {
 
         DispatchQueue.main.async { [weak self] in
             UIDevice.current.isBatteryMonitoringEnabled = true
-            try? AVAudioSession.sharedInstance().setActive(true)
             self?.refreshLiveState()
             self?.timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.refreshLiveState()
