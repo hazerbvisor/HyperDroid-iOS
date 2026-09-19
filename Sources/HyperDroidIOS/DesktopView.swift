@@ -13,6 +13,8 @@ struct DesktopView: View {
     @AppStorage("hd.nightLight") private var nightLight = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
     @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
+    @AppStorage("hd.cursorStyle") private var cursorStyle = "iPadOS"
+    @ObservedObject private var cursorPack = HDCursorPackManager.shared
 
     var body: some View {
         GeometryReader { geo in
@@ -200,6 +202,18 @@ struct DesktopView: View {
                         }
                         .zIndex(21000)
                 }
+
+                HDWindowsCursorOverlay()
+                    .zIndex(50000)
+            }
+            .background(
+                HDPointerHider(
+                    enabled: cursorStyle == "Windows 11" && cursorPack.hasUsablePack
+                )
+                .frame(width: 0, height: 0)
+            )
+            .onContinuousHover { phase in
+                HDCursorState.shared.update(phase)
             }
             .ignoresSafeArea(.container, edges: .all)
         }
@@ -271,6 +285,7 @@ struct DesktopView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .hdCursor(.hand)
 
             Spacer()
         }
@@ -427,6 +442,7 @@ private struct HDWindowView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
         .background(danger ? Color.red.opacity(0.001) : Color.clear)
     }
 }
