@@ -5,11 +5,13 @@ struct HDBrowserView: View {
     let onFocus: () -> Void
     let onClose: () -> Void
     let onMaximize: () -> Void
-    let onMove: (CGSize) -> Void
+    let onDragChanged: (CGSize) -> Void
+    let onDragEnded: (CGSize) -> Void
 
     @Environment(\.colorScheme) private var scheme
     @State private var address = "https://www.google.com"
     @State private var currentURL = URL(string: "https://www.google.com")!
+    @State private var dragStarted = false
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
@@ -47,8 +49,17 @@ struct HDBrowserView: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 1)
-                    .onChanged { _ in onFocus() }
-                    .onEnded { value in onMove(value.translation) }
+                    .onChanged { value in
+                        if !dragStarted {
+                            dragStarted = true
+                            onFocus()
+                        }
+                        onDragChanged(value.translation)
+                    }
+                    .onEnded { value in
+                        onDragEnded(value.translation)
+                        dragStarted = false
+                    }
             )
 
             HStack(spacing: 0) {
