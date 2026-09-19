@@ -1,10 +1,14 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct HDSettingsView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var page = "Personalize"
     @State private var updateMessage = ""
+    @State private var importingCursorPack = false
+    @State private var cursorImportMessage = ""
+    @ObservedObject private var cursorPack = HDCursorPackManager.shared
     @AppStorage("hd.settingsRequestedPage") private var requestedPage = "Personalize"
 
     @AppStorage("hd.theme") private var theme = "Dark"
@@ -36,6 +40,7 @@ struct HDSettingsView: View {
     @AppStorage("hd.nearbySharing") private var nearbySharing = true
     @AppStorage("hd.pointerSpeed") private var pointerSpeed = 0.50
     @AppStorage("hd.naturalScrolling") private var naturalScrolling = true
+    @AppStorage("hd.cursorStyle") private var cursorStyle = "iPadOS"
 
     @AppStorage("hd.defaultBrowser") private var defaultBrowser = "HyperDroid Browser"
     @AppStorage("hd.allowBackgroundApps") private var allowBackgroundApps = true
@@ -93,6 +98,13 @@ struct HDSettingsView: View {
             if pages.contains(value) {
                 page = value
             }
+        }
+        .fileImporter(
+            isPresented: $importingCursorPack,
+            allowedContentTypes: [UTType(filenameExtension: "cur") ?? .data],
+            allowsMultipleSelection: true
+        ) { result in
+            handleCursorImport(result)
         }
     }
 
@@ -225,8 +237,70 @@ struct HDSettingsView: View {
             }
 
             settingsSection("Mouse") {
-                sliderRow("Pointer speed", subtitle: "Pointer movement preference for HyperDroid", value: $pointerSpeed, range: 0...1, suffix: "")
-                toggleRow("Natural scrolling", subtitle: "Use natural scrolling preference", value: $naturalScrolling)
+                pickerRow(
+                    "Cursor style",
+                    subtitle: "Use the native iPad pointer or an imported Windows 11 cursor pack",
+                    selection: $cursorStyle,
+                    values: ["iPadOS", "Windows 11"]
+                )
+
+                sliderRow(
+                    "Pointer speed",
+                    subtitle: "Pointer movement preference for HyperDroid",
+                    value: $pointerSpeed,
+                    range: 0...1,
+                    suffix: ""
+                )
+
+                toggleRow(
+                    "Natural scrolling",
+                    subtitle: "Use natural scrolling preference",
+                    value: $naturalScrolling
+                )
+
+                infoRow(
+                    "Windows 11 cursor pack",
+                    value: cursorPack.hasUsablePack
+                        ? "\(cursorPack.installedCount)/\(HDCursorKind.allCases.count) cursors"
+                        : "Not imported"
+                )
+            }
+
+            actionRow(
+                "Download Windows 11 cursor pack",
+                subtitle: "Open the jepriCreations-compatible cursor repository"
+            ) {
+                if let url = URL(string: "https://github.com/SullensCR/Windows-11-Hdpi-Tail-Cursor-Concept-by-jepriCreations") {
+                    UIApplication.shared.open(url)
+                }
+            }
+
+            actionRow(
+                "Import .cur files",
+                subtitle: "Select arrow.cur, hand.cur, ibeam.cur and the resize cursors from the extracted pack"
+            ) {
+                importingCursorPack = true
+            }
+
+            if cursorPack.hasUsablePack {
+                actionRow(
+                    "Remove imported cursor pack",
+                    subtitle: "Return HyperDroid to the native iPadOS pointer"
+                ) {
+                    do {
+                        try cursorPack.clearImportedPack()
+                        cursorStyle = "iPadOS"
+                        cursorImportMessage = "Imported cursor pack removed"
+                    } catch {
+                        cursorImportMessage = error.localizedDescription
+                    }
+                }
+            }
+
+            if !cursorImportMessage.isEmpty {
+                settingsSection("Cursor pack status") {
+                    infoRow("Status", value: cursorImportMessage)
+                }
             }
 
             settingsSection("Sharing") {
@@ -460,6 +534,25 @@ struct HDSettingsView: View {
                 UIPasteboard.general.string = "https://github.com/windows-ui/HyperDroid"
                 updateMessage = "HyperDroid link copied"
             }
+        }
+    }
+
+    private func handleCursorImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            do {
+                let imported = try cursorPack.importCursorFiles(urls)
+                if cursorPack.hasUsablePack {
+                    cursorStyle = "Windows 11"
+                }
+                cursorImportMessage = imported > 0
+                    ? "Imported \(imported) cursor files"
+                    : "No supported .cur files were selected"
+            } catch {
+                cursorImportMessage = error.localizedDescription
+            }
+        case .failure(let error):
+            cursorImportMessage = error.localizedDescription
         }
     }
 
