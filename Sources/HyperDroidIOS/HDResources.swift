@@ -57,9 +57,23 @@ extension Color {
 }
 
 enum HDAsset {
+    private static let atlas: UIImage? = {
+        guard let url = Bundle.main.url(forResource: "hyperdroid_ui_atlas", withExtension: "png") else { return nil }
+        return UIImage(contentsOfFile: url.path)
+    }()
+
     static func uiImage(_ name: String, template: Bool = false) -> UIImage? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
-              let image = UIImage(contentsOfFile: url.path) else { return nil }
+        guard let atlas, let rect = HDAtlas.rects[name], let cg = atlas.cgImage else { return nil }
+        let scaleX = CGFloat(cg.width) / atlas.size.width
+        let scaleY = CGFloat(cg.height) / atlas.size.height
+        let pixelRect = CGRect(
+            x: rect.origin.x * scaleX,
+            y: rect.origin.y * scaleY,
+            width: rect.size.width * scaleX,
+            height: rect.size.height * scaleY
+        ).integral
+        guard let cropped = cg.cropping(to: pixelRect) else { return nil }
+        let image = UIImage(cgImage: cropped, scale: atlas.scale, orientation: .up)
         return template ? image.withRenderingMode(.alwaysTemplate) : image
     }
 }
