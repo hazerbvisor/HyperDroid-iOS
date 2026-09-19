@@ -13,6 +13,7 @@ struct HDActionCenterView: View {
     @AppStorage("hd.transparency") private var transparency = true
 
     @State private var accessibility = false
+    @State private var detail: String?
 
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
@@ -27,41 +28,46 @@ struct HDActionCenterView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
-                spacing: 12
-            ) {
-                ForEach(items, id: \.0) { item in
-                    VStack(spacing: 6) {
-                        Button {
-                            toggle(item.0)
-                        } label: {
-                            HDImage(
-                                name: item.1,
-                                template: true,
-                                tint: isEnabled(item.0) ? .white : p.text
-                            )
-                            .frame(width: 20, height: 20)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(isEnabled(item.0) ? p.primary : p.dialogBody.opacity(0.72))
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 5)
-                                    .stroke(p.border.opacity(0.45), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
+            if let detail {
+                networkDetail(detail)
+                    .padding(14)
+            } else {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
+                    spacing: 12
+                ) {
+                    ForEach(items, id: \.0) { item in
+                        VStack(spacing: 6) {
+                            Button {
+                                activate(item.0)
+                            } label: {
+                                HDImage(
+                                    name: item.1,
+                                    template: true,
+                                    tint: isEnabled(item.0) ? .white : p.text
+                                )
+                                .frame(width: 20, height: 20)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(isEnabled(item.0) ? p.primary : p.dialogBody.opacity(0.72))
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 5)
+                                        .stroke(p.border.opacity(0.45), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
 
-                        Text(item.0)
-                            .font(.system(size: 11))
-                            .foregroundColor(p.text)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                            Text(item.0)
+                                .font(.system(size: 11))
+                                .foregroundColor(p.text)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
                     }
                 }
+                .padding(20)
             }
-            .padding(20)
 
             VStack(spacing: 7) {
                 HStack {
@@ -96,12 +102,9 @@ struct HDActionCenterView: View {
             HStack {
                 HStack(spacing: 6) {
                     ZStack(alignment: .topTrailing) {
-                        HDImage(
-                            name: "ui_tb_battery_10_24",
-                            template: true,
-                            tint: p.text
-                        )
-                        .frame(width: 20, height: 20)
+                        Image(systemName: batterySymbol)
+                            .font(.system(size: 18, weight: .medium))
+                            .frame(width: 22, height: 20)
 
                         if system.charging {
                             Image(systemName: "bolt.fill")
@@ -140,6 +143,75 @@ struct HDActionCenterView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(p.border.opacity(0.8), lineWidth: 1))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+    }
+
+    private var batterySymbol: String {
+        switch system.batteryPercent {
+        case 0..<13: return "battery.0"
+        case 13..<38: return "battery.25"
+        case 38..<63: return "battery.50"
+        case 63..<88: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+
+    @ViewBuilder
+    private func networkDetail(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(p.text)
+                Spacer()
+                Button("Done") {
+                    detail = nil
+                }
+                .font(.system(size: 11.5, weight: .semibold))
+                .buttonStyle(.borderedProminent)
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: system.networkConnected ? "wifi" : "network.slash")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(system.networkConnected ? p.primary : p.mutedText)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(system.networkConnected ? system.networkKind : "Offline")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundColor(p.text)
+                    Text(system.networkConnected ? "iPadOS reports an active connection" : "No active network connection")
+                        .font(.system(size: 10.5))
+                        .foregroundColor(p.mutedText)
+                }
+                Spacer()
+            }
+
+            Toggle("HyperDroid web access", isOn: $webAccess)
+                .font(.system(size: 11.5))
+                .foregroundColor(p.text)
+
+            Button("See more") {
+                onOpenSettings()
+            }
+            .font(.system(size: 11.5, weight: .semibold))
+            .buttonStyle(.bordered)
+        }
+        .padding(12)
+        .background(p.dialogBody.opacity(0.72))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(p.border.opacity(0.45), lineWidth: 1)
+        )
+    }
+
+    private func activate(_ item: String) {
+        switch item {
+        case "Wi-Fi", "Internet":
+            detail = item
+        default:
+            toggle(item)
+        }
     }
 
     private func isEnabled(_ item: String) -> Bool {
