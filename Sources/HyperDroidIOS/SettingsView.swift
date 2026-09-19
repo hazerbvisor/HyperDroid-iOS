@@ -13,10 +13,12 @@ struct HDSettingsView: View {
     @AppStorage("hd.startShowSearch") private var startShowSearch = true
     @AppStorage("hd.startShowRecommended") private var startShowRecommended = true
     @AppStorage("hd.startCompact") private var startCompact = false
+    @AppStorage("hd.startColumns") private var startColumns = "Default"
+    @AppStorage("hd.startSearchFocus") private var startSearchFocus = false
 
     @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
     @AppStorage("hd.taskbarShowWidgets") private var taskbarShowWidgets = true
-    @AppStorage("hd.taskbarShowSearch") private var taskbarShowSearch = true
+    @AppStorage("hd.taskbarSearchMode") private var taskbarSearchMode = "Search box"
     @AppStorage("hd.taskbarShowClock") private var taskbarShowClock = true
     @AppStorage("hd.taskbarShowSeconds") private var taskbarShowSeconds = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
@@ -242,7 +244,14 @@ struct HDSettingsView: View {
             }
 
             settingsSection("Start") {
+                pickerRow(
+                    "Start layout",
+                    subtitle: "Match the original 4-column, default, or 6-column Start layout",
+                    selection: $startColumns,
+                    values: ["4 columns", "Default", "6 columns"]
+                )
                 toggleRow("Show search", subtitle: "Show the search box in Start", value: $startShowSearch)
+                toggleRow("Focus search on open", subtitle: "Put the cursor in Start search as soon as Start opens", value: $startSearchFocus)
                 toggleRow("Show Recommended", subtitle: "Show the Recommended area in Start", value: $startShowRecommended)
                 toggleRow("Compact Start", subtitle: "Use a shorter Start menu", value: $startCompact)
             }
@@ -255,7 +264,12 @@ struct HDSettingsView: View {
                     values: ["Center", "Left"]
                 )
                 toggleRow("Widgets", subtitle: "Show the Widgets button", value: $taskbarShowWidgets)
-                toggleRow("Search", subtitle: "Show the Windows-style Search pill in the taskbar", value: $taskbarShowSearch)
+                pickerRow(
+                    "Search",
+                    subtitle: "Choose the original Search box, Search icon, or hide Search",
+                    selection: $taskbarSearchMode,
+                    values: ["Search box", "Search icon", "Hidden"]
+                )
                 toggleRow("Clock", subtitle: "Show time and date in the system tray", value: $taskbarShowClock)
                 toggleRow("Seconds", subtitle: "Show seconds in the taskbar clock", value: $taskbarShowSeconds)
                 toggleRow("Automatically hide", subtitle: "Hide the taskbar while desktop apps are active", value: $taskbarAutoHide)
