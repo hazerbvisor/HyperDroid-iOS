@@ -113,6 +113,58 @@ final class HDCursorPackManager: ObservableObject {
         return imported
     }
 
+    func installFromSource(variant: String) async throws -> Int {
+        let normalizedVariant = variant.lowercased() == "dark" ? "dark" : "light"
+        let base = "https://raw.githubusercontent.com/SullensCR/Windows-11-Hdpi-Tail-Cursor-Concept-by-jepriCreations/v2/cursor/assets/\(normalizedVariant)"
+
+        try FileManager.default.createDirectory(
+            at: packDirectory,
+            withIntermediateDirectories: true
+        )
+
+        var installed = 0
+
+        for kind in HDCursorKind.allCases {
+            guard let url = URL(string: base + "/" + kind.fileName) else {
+                continue
+            }
+
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let http = response as? HTTPURLResponse,
+                  http.statusCode == 200 else {
+                throw NSError(
+                    domain: "HyperDroid.CursorInstall",
+                    code: 20,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Failed to download \(kind.fileName) from the cursor source."
+                    ]
+                )
+            }
+
+            guard data.count >= 6,
+                  Self.readUInt16(data, 0) == 0,
+                  Self.readUInt16(data, 2) == 2 else {
+                throw NSError(
+                    domain: "HyperDroid.CursorInstall",
+                    code: 21,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Downloaded \(kind.fileName) is not a valid Windows cursor."
+                    ]
+                )
+            }
+
+            let destination = packDirectory.appendingPathComponent(kind.fileName)
+            try data.write(to: destination, options: .atomic)
+            installed += 1
+        }
+
+        reload()
+        return installed
+    }
+
     func clearImportedPack() throws {
         if FileManager.default.fileExists(atPath: packDirectory.path) {
             try FileManager.default.removeItem(at: packDirectory)
