@@ -47,6 +47,7 @@ struct HDTaskbarView: View {
                             .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
                     }
                     .buttonStyle(.plain)
+                    .hdCursor(.hand)
                     Spacer()
                 }
             }
@@ -84,6 +85,7 @@ struct HDTaskbarView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    .hdCursor(.hand)
                 } else if searchMode == "Search icon" {
                     Button(action: onSearch) {
                         Image(systemName: "magnifyingglass")
@@ -92,6 +94,7 @@ struct HDTaskbarView: View {
                             .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
                     }
                     .buttonStyle(.plain)
+                    .hdCursor(.hand)
                 }
 
                 ForEach([HDAppEntry.builtIns[1], HDAppEntry.builtIns[0], HDAppEntry.builtIns[2]]) { app in
@@ -154,6 +157,7 @@ struct HDTaskbarView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .hdCursor(.hand)
 
                 if showClock {
                     Button(action: onToggleCalendar) {
@@ -175,6 +179,7 @@ struct HDTaskbarView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .hdCursor(.hand)
                 }
             }
             .foregroundColor(p.text)
@@ -243,6 +248,7 @@ private struct HDTaskbarIcon: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
     }
 }
 
