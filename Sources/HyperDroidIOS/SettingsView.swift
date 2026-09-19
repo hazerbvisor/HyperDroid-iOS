@@ -598,6 +598,7 @@ struct HDSettingsView: View {
             Toggle("", isOn: value)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .hdCursor(.hand)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 56)
@@ -630,6 +631,7 @@ struct HDSettingsView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(maxWidth: 190, alignment: .trailing)
+            .hdCursor(.hand)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 58)
@@ -690,6 +692,7 @@ struct HDSettingsView: View {
             TextField("", text: text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 190)
+                .hdCursor(.ibeam)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 60)
@@ -765,6 +768,7 @@ struct HDSettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(p.border.opacity(0.55), lineWidth: 1))
         }
         .buttonStyle(.plain)
+        .hdCursor(.hand)
     }
 
     private var divider: some View {
