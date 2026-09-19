@@ -80,41 +80,40 @@ struct HDBrowserView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 2) {
                     ForEach(tabs) { tab in
-                        Button {
-                            selectTab(tab.id)
-                        } label: {
-                            HStack(spacing: 7) {
-                                HDImage(name: "img_app_chrome")
-                                    .frame(width: 15, height: 15)
+                        HStack(spacing: 7) {
+                            HDImage(name: "img_app_chrome")
+                                .frame(width: 15, height: 15)
 
-                                Text(tab.title.isEmpty ? displayTitle(for: tab.url) : tab.title)
-                                    .font(.system(size: 11.5))
-                                    .foregroundColor(p.text)
-                                    .lineLimit(1)
+                            Text(tab.title.isEmpty ? displayTitle(for: tab.url) : tab.title)
+                                .font(.system(size: 11.5))
+                                .foregroundColor(p.text)
+                                .lineLimit(1)
 
-                                Spacer(minLength: 2)
+                            Spacer(minLength: 2)
 
-                                Button {
-                                    closeTab(tab.id)
-                                } label: {
-                                    Text("×")
-                                        .font(.system(size: 14))
-                                        .foregroundColor(p.mutedText)
-                                        .frame(width: 20, height: 20)
-                                }
-                                .buttonStyle(.plain)
+                            Button {
+                                closeTab(tab.id)
+                            } label: {
+                                Text("×")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(p.mutedText)
+                                    .frame(width: 20, height: 20)
                             }
-                            .padding(.leading, 10)
-                            .padding(.trailing, 5)
-                            .frame(width: 160, height: 35)
-                            .background(
-                                selectedTabID == tab.id
-                                    ? p.dialogBody
-                                    : p.dialog.opacity(0.45)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
+                        .padding(.leading, 10)
+                        .padding(.trailing, 5)
+                        .frame(width: 160, height: 35)
+                        .background(
+                            selectedTabID == tab.id
+                                ? p.dialogBody
+                                : p.dialog.opacity(0.45)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            selectTab(tab.id)
+                        }
                     }
                 }
                 .padding(.leading, 6)
@@ -314,7 +313,7 @@ struct HDBrowserView: View {
     }
 }
 
-struct HDWebView: UIViewRepresentable {
+private struct HDWebView: UIViewRepresentable {
     @Binding var url: URL
     @Binding var title: String
 
@@ -334,10 +333,12 @@ struct HDWebView: UIViewRepresentable {
         config.preferences.isElementFullscreenEnabled = true
         config.allowsInlineMediaPlayback = true
         config.allowsPictureInPictureMediaPlayback = true
+        config.allowsAirPlayForMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
 
         let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
         view.allowsBackForwardNavigationGestures = true
         view.scrollView.keyboardDismissMode = .interactive
         view.scrollView.contentInsetAdjustmentBehavior = .never
@@ -367,7 +368,7 @@ struct HDWebView: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var parent: HDWebView
         var lastCommandSerial = 0
 
@@ -384,6 +385,18 @@ struct HDWebView: UIViewRepresentable {
             if !webTitle.isEmpty && parent.title != webTitle {
                 parent.title = webTitle
             }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                webView.load(navigationAction.request)
+            }
+            return nil
         }
     }
 }
