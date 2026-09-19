@@ -691,14 +691,14 @@ struct HyperStartMenu: View {
                     StartMenuApp("Clock", "clock.fill", Color.black) {}
                     StartMenuApp("Settings", "gearshape.fill", Color.gray) { onOpen(.settings) }
                     StartMenuApp("Themes", "paintpalette.fill", Color.purple) { onOpen(.settings) }
-                    StartMenuApp("Play Store", "play.fill", Color.white) {}
+                    StartMenuApp("Play Store", "play.fill", Color.white, darkGlyph: true) {}
 
-                    StartMenuApp("Gmail", "envelope.fill", Color.white) {}
+                    StartMenuApp("Gmail", "envelope.fill", Color.white, darkGlyph: true) {}
                     StartMenuApp("YouTube", "play.rectangle.fill", Color.red) { onOpen(.browser) }
                     StartMenuApp("File Manager", "folder.fill", Color.yellow) { onOpen(.files) }
                     StartMenuApp("Gallery", "photo.fill", Color.indigo) {}
                     StartMenuApp("Services & f...", "questionmark.app.fill", Color.cyan) {}
-                    StartMenuApp("Calendar", "calendar", Color.white) {}
+                    StartMenuApp("Calendar", "calendar", Color.white, darkGlyph: true) {}
 
                     StartMenuApp("Recorder", "waveform", Color(red: 0.2, green: 0.16, blue: 0.14)) {}
                     StartMenuApp("Outlook", "envelope.badge.fill", Color.blue) {}
@@ -764,12 +764,14 @@ struct StartMenuApp: View {
     let name: String
     let symbol: String
     let color: Color
+    let darkGlyph: Bool
     let action: () -> Void
 
-    init(_ name: String, _ symbol: String, _ color: Color, action: @escaping () -> Void) {
+    init(_ name: String, _ symbol: String, _ color: Color, darkGlyph: Bool = false, action: @escaping () -> Void) {
         self.name = name
         self.symbol = symbol
         self.color = color
+        self.darkGlyph = darkGlyph
         self.action = action
     }
 
@@ -778,12 +780,12 @@ struct StartMenuApp: View {
             VStack(spacing: 5) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(color.opacity(color == .white ? 0.96 : 0.88))
+                        .fill(color.opacity(darkGlyph ? 0.96 : 0.88))
                         .frame(width: 30, height: 30)
 
                     Image(systemName: symbol)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(color == .white ? .black.opacity(0.75) : .white)
+                        .foregroundColor(darkGlyph ? .black.opacity(0.75) : .white)
                 }
 
                 Text(name)
@@ -1059,7 +1061,7 @@ struct SettingsPane: View {
 
     private let nav: [(String, String)] = [
         ("System", "display"),
-        ("Bluetooth & devices", "bluetooth"),
+        ("Bluetooth & devices", "link"),
         ("Personalize", "paintbrush.fill"),
         ("Apps", "square.grid.2x2.fill"),
         ("Accounts", "person.fill"),
@@ -1155,7 +1157,7 @@ struct PersonalizeSettings: View {
             SettingsCard(title: "Background", subtitle: "Background image, color, slideshow", symbol: "photo")
             SettingsCard(title: "Colors", subtitle: "Accent color, transparency effects, color theme", symbol: "paintpalette")
             SettingsCard(title: "Start", subtitle: "Config StartMenu pattern and layout", symbol: "square.grid.2x2")
-            SettingsCard(title: "Taskbar", subtitle: "Taskbar behaviours, system pins", symbol: "rectangle.bottomhalf.inset.filled")
+            SettingsCard(title: "Taskbar", subtitle: "Taskbar behaviours, system pins", symbol: "rectangle.inset.filled")
 
             Spacer(minLength: 20)
         }
