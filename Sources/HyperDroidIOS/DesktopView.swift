@@ -1,18 +1,18 @@
 import SwiftUI
 import Foundation
 
+// MARK: - Window model
+
 enum HyperWindowKind: String, CaseIterable {
     case files
     case browser
     case settings
-    case about
 
     var title: String {
         switch self {
-        case .files: return "File Explorer"
-        case .browser: return "Browser"
+        case .files: return "This PC"
+        case .browser: return "UiChrome"
         case .settings: return "Settings"
-        case .about: return "About HyperDroid"
         }
     }
 
@@ -21,7 +21,6 @@ enum HyperWindowKind: String, CaseIterable {
         case .files: return "folder.fill"
         case .browser: return "globe"
         case .settings: return "gearshape.fill"
-        case .about: return "info.circle.fill"
         }
     }
 }
@@ -32,6 +31,7 @@ struct HyperWindow: Identifiable, Equatable {
     var position: CGPoint
     var size: CGSize
     var zIndex: Int
+    var maximized: Bool
 
     init(kind: HyperWindowKind, position: CGPoint, size: CGSize, zIndex: Int) {
         self.id = UUID()
@@ -39,34 +39,49 @@ struct HyperWindow: Identifiable, Equatable {
         self.position = position
         self.size = size
         self.zIndex = zIndex
+        self.maximized = false
     }
 }
 
 @MainActor
 final class DesktopModel: ObservableObject {
     @Published var windows: [HyperWindow] = []
-    @Published var startMenuPresented = false
     @Published var activeWindowID: UUID?
+    @Published var startMenuPresented = false
+    @Published var quickSettingsPresented = false
 
     private var nextZIndex = 1
 
     func open(_ kind: HyperWindowKind, in desktopSize: CGSize) {
         if let existing = windows.first(where: { $0.kind == kind }) {
             focus(existing.id)
+            startMenuPresented = false
             return
         }
 
-        let width = min(max(desktopSize.width * 0.58, 520), 920)
-        let height = min(max(desktopSize.height * 0.62, 380), 680)
-        let stagger = CGFloat(windows.count % 5) * 26
+        let baseWidth: CGFloat
+        let baseHeight: CGFloat
 
+        switch kind {
+        case .files:
+            baseWidth = min(850, desktopSize.width * 0.82)
+            baseHeight = min(600, desktopSize.height * 0.76)
+        case .settings:
+            baseWidth = min(760, desktopSize.width * 0.74)
+            baseHeight = min(600, desktopSize.height * 0.76)
+        case .browser:
+            baseWidth = min(860, desktopSize.width * 0.82)
+            baseHeight = min(610, desktopSize.height * 0.78)
+        }
+
+        let stagger = CGFloat(windows.count % 4) * 20
         let window = HyperWindow(
             kind: kind,
             position: CGPoint(
-                x: max(width / 2 + 20, desktopSize.width / 2 + stagger),
-                y: max(height / 2 + 20, desktopSize.height / 2 - 22 + stagger)
+                x: desktopSize.width / 2 + stagger,
+                y: (desktopSize.height - 52) / 2 + stagger * 0.45
             ),
-            size: CGSize(width: width, height: height),
+            size: CGSize(width: max(520, baseWidth), height: max(380, baseHeight)),
             zIndex: nextZIndex
         )
 
@@ -74,6 +89,7 @@ final class DesktopModel: ObservableObject {
         windows.append(window)
         activeWindowID = window.id
         startMenuPresented = false
+        quickSettingsPresented = false
     }
 
     func focus(_ id: UUID) {
@@ -81,6 +97,7 @@ final class DesktopModel: ObservableObject {
         windows[index].zIndex = nextZIndex
         nextZIndex += 1
         activeWindowID = id
+        quickSettingsPresented = false
     }
 
     func close(_ id: UUID) {
@@ -96,11 +113,19 @@ final class DesktopModel: ObservableObject {
     func resize(_ id: UUID, to size: CGSize) {
         guard let index = windows.firstIndex(where: { $0.id == id }) else { return }
         windows[index].size = CGSize(
-            width: max(360, size.width),
-            height: max(260, size.height)
+            width: max(480, size.width),
+            height: max(330, size.height)
         )
     }
+
+    func toggleMaximize(_ id: UUID, desktopSize: CGSize) {
+        guard let index = windows.firstIndex(where: { $0.id == id }) else { return }
+        windows[index].maximized.toggle()
+        focus(id)
+    }
 }
+
+// MARK: - Desktop
 
 struct DesktopView: View {
     @StateObject private var model = DesktopModel()
@@ -108,198 +133,253 @@ struct DesktopView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                DesktopWallpaper()
+                Windows11Wallpaper()
 
-                desktopIcons(in: geometry.size)
+                DesktopShortcuts {
+                    model.open(.files, in: geometry.size)
+                }
 
                 ForEach(model.windows.sorted(by: { $0.zIndex < $1.zIndex })) { window in
                     DesktopWindowView(
                         window: window,
+                        desktopSize: geometry.size,
                         isActive: model.activeWindowID == window.id,
                         onFocus: { model.focus(window.id) },
                         onClose: { model.close(window.id) },
                         onMove: { model.move(window.id, to: $0) },
-                        onResize: { model.resize(window.id, to: $0) }
+                        onResize: { model.resize(window.id, to: $0) },
+                        onMaximize: { model.toggleMaximize(window.id, desktopSize: geometry.size) }
                     )
                     .zIndex(Double(window.zIndex))
                 }
 
-                if model.startMenuPresented {
-                    StartMenu(
-                        onOpen: { model.open($0, in: geometry.size) },
-                        onDismiss: { model.startMenuPresented = false }
-                    )
-                    .transition(.scale(scale: 0.96, anchor: .bottom))
-                    .zIndex(10_000)
+                if model.startMenuPresented || model.quickSettingsPresented {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                model.startMenuPresented = false
+                                model.quickSettingsPresented = false
+                            }
+                        }
+                        .zIndex(9000)
                 }
 
-                VStack {
+                if model.startMenuPresented {
+                    HyperStartMenu(
+                        onOpen: { model.open($0, in: geometry.size) },
+                        onPower: { model.startMenuPresented = false }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(10000)
+                }
+
+                if model.quickSettingsPresented {
+                    QuickSettingsPanel()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .zIndex(10000)
+                }
+
+                VStack(spacing: 0) {
                     Spacer()
-                    Taskbar(
-                        windows: model.windows.sorted(by: { $0.zIndex < $1.zIndex }),
+                    HyperTaskbar(
+                        windows: model.windows,
                         activeWindowID: model.activeWindowID,
-                        startMenuPresented: model.startMenuPresented,
+                        startPresented: model.startMenuPresented,
                         onStart: {
-                            withAnimation(.easeOut(duration: 0.16)) {
+                            withAnimation(.easeOut(duration: 0.14)) {
                                 model.startMenuPresented.toggle()
+                                model.quickSettingsPresented = false
                             }
                         },
                         onOpen: { model.open($0, in: geometry.size) },
-                        onWindowTap: { model.focus($0) }
+                        onWindowTap: { model.focus($0) },
+                        onTray: {
+                            withAnimation(.easeOut(duration: 0.14)) {
+                                model.quickSettingsPresented.toggle()
+                                model.startMenuPresented = false
+                            }
+                        }
                     )
                 }
-                .zIndex(20_000)
+                .zIndex(20000)
             }
             .ignoresSafeArea()
-            .contentShape(Rectangle())
-            .onTapGesture {
-                if model.startMenuPresented {
-                    withAnimation(.easeOut(duration: 0.12)) {
-                        model.startMenuPresented = false
-                    }
-                }
+        }
+    }
+}
+
+struct Windows11Wallpaper: View {
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.025, green: 0.13, blue: 0.34),
+                        Color(red: 0.018, green: 0.28, blue: 0.54),
+                        Color(red: 0.04, green: 0.10, blue: 0.28)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Ellipse()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.cyan.opacity(0.9), Color.blue.opacity(0.45)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: geo.size.width * 0.55, height: geo.size.height * 0.50)
+                    .rotationEffect(.degrees(-22))
+                    .offset(x: geo.size.width * 0.12, y: geo.size.height * 0.10)
+                    .blur(radius: 3)
+
+                Ellipse()
+                    .stroke(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.95), Color.purple.opacity(0.75), Color.pink.opacity(0.65)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: max(50, geo.size.width * 0.09)
+                    )
+                    .frame(width: geo.size.width * 0.53, height: geo.size.height * 0.64)
+                    .rotationEffect(.degrees(24))
+                    .offset(x: geo.size.width * 0.26, y: geo.size.height * 0.10)
+                    .blur(radius: 2)
+
+                LinearGradient(
+                    colors: [Color.white.opacity(0.12), Color.clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
             }
         }
     }
+}
 
-    private func desktopIcons(in size: CGSize) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            DesktopIcon(title: "Files", symbol: "folder.fill") {
-                model.open(.files, in: size)
-            }
+struct DesktopShortcuts: View {
+    let openFiles: () -> Void
 
-            DesktopIcon(title: "Browser", symbol: "globe") {
-                model.open(.browser, in: size)
-            }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Button(action: openFiles) {
+                VStack(spacing: 5) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.cyan, Color.blue],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .frame(width: 39, height: 29)
 
-            DesktopIcon(title: "Settings", symbol: "gearshape.fill") {
-                model.open(.settings, in: size)
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.white.opacity(0.22))
+                            .frame(width: 32, height: 2)
+                            .offset(y: 11)
+                    }
+
+                    Text("This PC")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white)
+                        .shadow(color: .black, radius: 2)
+                }
+                .frame(width: 76)
             }
+            .buttonStyle(.plain)
 
             Spacer()
         }
-        .padding(.top, 44)
-        .padding(.leading, 24)
+        .padding(.top, 24)
+        .padding(.leading, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
-struct DesktopWallpaper: View {
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.025, green: 0.08, blue: 0.18),
-                    Color(red: 0.03, green: 0.28, blue: 0.52),
-                    Color(red: 0.06, green: 0.12, blue: 0.28)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            Circle()
-                .fill(Color.cyan.opacity(0.18))
-                .frame(width: 560, height: 560)
-                .blur(radius: 90)
-                .offset(x: 250, y: -110)
-
-            Circle()
-                .fill(Color.blue.opacity(0.16))
-                .frame(width: 420, height: 420)
-                .blur(radius: 70)
-                .offset(x: -260, y: 180)
-        }
-    }
-}
-
-struct DesktopIcon: View {
-    let title: String
-    let symbol: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: symbol)
-                    .font(.system(size: 34, weight: .semibold))
-                    .frame(width: 58, height: 58)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .shadow(radius: 2)
-            }
-            .frame(width: 78)
-        }
-        .buttonStyle(.plain)
-    }
-}
+// MARK: - Windows
 
 struct DesktopWindowView: View {
     let window: HyperWindow
+    let desktopSize: CGSize
     let isActive: Bool
     let onFocus: () -> Void
     let onClose: () -> Void
     let onMove: (CGPoint) -> Void
     let onResize: (CGSize) -> Void
+    let onMaximize: () -> Void
 
     @State private var dragTranslation: CGSize = .zero
     @State private var resizeTranslation: CGSize = .zero
 
-    var body: some View {
-        VStack(spacing: 0) {
-            titleBar
-            windowContent
+    private var effectiveSize: CGSize {
+        if window.maximized {
+            return CGSize(width: desktopSize.width, height: max(320, desktopSize.height - 49))
         }
-        .frame(
+        return CGSize(
             width: window.size.width + resizeTranslation.width,
             height: window.size.height + resizeTranslation.height
         )
-        .background(Color(red: 0.055, green: 0.065, blue: 0.085))
-        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(isActive ? Color.white.opacity(0.28) : Color.white.opacity(0.12), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(isActive ? 0.44 : 0.27), radius: isActive ? 24 : 14, y: 8)
-        .overlay(alignment: .bottomTrailing) {
-            resizeHandle
+    }
+
+    private var effectivePosition: CGPoint {
+        if window.maximized {
+            return CGPoint(x: desktopSize.width / 2, y: max(160, (desktopSize.height - 49) / 2))
         }
-        .position(
+        return CGPoint(
             x: window.position.x + dragTranslation.width,
             y: window.position.y + dragTranslation.height
         )
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            windowTitleBar
+            windowContent
+        }
+        .frame(width: effectiveSize.width, height: effectiveSize.height)
+        .background(Color(red: 0.075, green: 0.075, blue: 0.082))
+        .clipShape(RoundedRectangle(cornerRadius: window.maximized ? 0 : 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: window.maximized ? 0 : 8, style: .continuous)
+                .stroke(Color.white.opacity(isActive ? 0.18 : 0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(window.maximized ? 0 : 0.5), radius: 18, y: 8)
+        .overlay(alignment: .bottomTrailing) {
+            if !window.maximized {
+                resizeHandle
+            }
+        }
+        .position(effectivePosition)
         .onTapGesture(perform: onFocus)
     }
 
-    private var titleBar: some View {
-        HStack(spacing: 10) {
+    private var windowTitleBar: some View {
+        HStack(spacing: 9) {
             Image(systemName: window.kind.symbol)
-                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 13))
+                .foregroundColor(.white.opacity(0.9))
 
             Text(window.kind.title)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundColor(.white.opacity(0.92))
 
             Spacer()
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .frame(width: 36, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .background(Color.red.opacity(0.001))
+            WindowControlButton(symbol: "minus", action: onFocus)
+            WindowControlButton(symbol: "square", action: onMaximize)
+            WindowControlButton(symbol: "xmark", destructive: true, action: onClose)
         }
         .padding(.leading, 12)
-        .padding(.trailing, 5)
-        .frame(height: 38)
-        .background(isActive ? Color.white.opacity(0.095) : Color.white.opacity(0.055))
+        .frame(height: 36)
+        .background(Color(red: 0.105, green: 0.105, blue: 0.112))
         .contentShape(Rectangle())
         .gesture(
-            DragGesture(minimumDistance: 1)
+            DragGesture(minimumDistance: window.maximized ? 10000 : 1)
                 .onChanged { value in
                     onFocus()
                     dragTranslation = value.translation
@@ -325,23 +405,27 @@ struct DesktopWindowView: View {
             BrowserPane()
         case .settings:
             SettingsPane()
-        case .about:
-            AboutPane()
         }
     }
 
     private var resizeHandle: some View {
-        Image(systemName: "arrow.down.right.and.arrow.up.left")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(.white.opacity(0.35))
-            .frame(width: 30, height: 30)
-            .contentShape(Rectangle())
+        Color.white.opacity(0.001)
+            .frame(width: 26, height: 26)
+            .overlay(alignment: .bottomTrailing) {
+                Path { path in
+                    path.move(to: CGPoint(x: 10, y: 24))
+                    path.addLine(to: CGPoint(x: 24, y: 10))
+                    path.move(to: CGPoint(x: 16, y: 24))
+                    path.addLine(to: CGPoint(x: 24, y: 16))
+                }
+                .stroke(Color.white.opacity(0.25), lineWidth: 1)
+            }
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .onChanged { value in
                         resizeTranslation = CGSize(
-                            width: max(360 - window.size.width, value.translation.width),
-                            height: max(260 - window.size.height, value.translation.height)
+                            width: max(480 - window.size.width, value.translation.width),
+                            height: max(330 - window.size.height, value.translation.height)
                         )
                     }
                     .onEnded { value in
@@ -357,207 +441,575 @@ struct DesktopWindowView: View {
     }
 }
 
-struct Taskbar: View {
-    let windows: [HyperWindow]
-    let activeWindowID: UUID?
-    let startMenuPresented: Bool
-    let onStart: () -> Void
-    let onOpen: (HyperWindowKind) -> Void
-    let onWindowTap: (UUID) -> Void
-
-    var body: some View {
-        HStack(spacing: 7) {
-            TaskbarButton(symbol: "square.grid.2x2.fill", selected: startMenuPresented, action: onStart)
-
-            TaskbarButton(symbol: "folder.fill", selected: windows.contains(where: { $0.kind == .files && $0.id == activeWindowID })) {
-                if let window = windows.first(where: { $0.kind == .files }) {
-                    onWindowTap(window.id)
-                } else {
-                    onOpen(.files)
-                }
-            }
-
-            TaskbarButton(symbol: "globe", selected: windows.contains(where: { $0.kind == .browser && $0.id == activeWindowID })) {
-                if let window = windows.first(where: { $0.kind == .browser }) {
-                    onWindowTap(window.id)
-                } else {
-                    onOpen(.browser)
-                }
-            }
-
-            TaskbarButton(symbol: "gearshape.fill", selected: windows.contains(where: { $0.kind == .settings && $0.id == activeWindowID })) {
-                if let window = windows.first(where: { $0.kind == .settings }) {
-                    onWindowTap(window.id)
-                } else {
-                    onOpen(.settings)
-                }
-            }
-
-            Spacer(minLength: 10)
-
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(Date.now, format: .dateTime.hour().minute())
-                    .font(.system(size: 12, weight: .medium))
-                Text(Date.now, format: .dateTime.day().month().year())
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 52)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .top) {
-            Divider().opacity(0.4)
-        }
-    }
-}
-
-struct TaskbarButton: View {
+struct WindowControlButton: View {
     let symbol: String
-    let selected: Bool
+    var destructive = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 19, weight: .semibold))
-                .frame(width: 40, height: 38)
-                .background(
-                    selected ? Color.white.opacity(0.15) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 9)
-                )
+                .font(.system(size: 10, weight: .regular))
+                .foregroundColor(.white.opacity(0.9))
+                .frame(width: 44, height: 36)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .background(destructive ? Color.red.opacity(0.001) : Color.clear)
     }
 }
 
-struct StartMenu: View {
+// MARK: - Taskbar + Start menu
+
+struct HyperTaskbar: View {
+    let windows: [HyperWindow]
+    let activeWindowID: UUID?
+    let startPresented: Bool
+    let onStart: () -> Void
     let onOpen: (HyperWindowKind) -> Void
-    let onDismiss: () -> Void
+    let onWindowTap: (UUID) -> Void
+    let onTray: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("HyperDroid")
-                    .font(.title3.bold())
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+
+            Rectangle()
+                .fill(Color(red: 0.09, green: 0.10, blue: 0.12).opacity(0.72))
+
+            HStack(spacing: 0) {
+                Button(action: { onOpen(.files) }) {
+                    WindowsLogo()
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 4)
+
                 Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
+
+                HStack(spacing: 4) {
+                    TaskbarSquare(selected: startPresented, action: onStart) {
+                        WindowsLogo()
+                    }
+
+                    Button(action: onStart) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 13, weight: .semibold))
+                            Text("Search")
+                                .font(.system(size: 13))
+                            Spacer(minLength: 2)
+                        }
+                        .foregroundColor(.white.opacity(0.92))
+                        .padding(.horizontal, 11)
+                        .frame(width: 142, height: 34)
+                        .background(Color.white.opacity(0.085))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    TaskbarAppButton(
+                        kind: .browser,
+                        symbol: "globe",
+                        windows: windows,
+                        activeWindowID: activeWindowID,
+                        onOpen: onOpen,
+                        onWindowTap: onWindowTap
+                    )
+
+                    TaskbarAppButton(
+                        kind: .files,
+                        symbol: "folder.fill",
+                        windows: windows,
+                        activeWindowID: activeWindowID,
+                        onOpen: onOpen,
+                        onWindowTap: onWindowTap
+                    )
+
+                    TaskbarAppButton(
+                        kind: .settings,
+                        symbol: "gearshape.fill",
+                        windows: windows,
+                        activeWindowID: activeWindowID,
+                        onOpen: onOpen,
+                        onWindowTap: onWindowTap
+                    )
+                }
+
+                Spacer()
+
+                Button(action: onTray) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 9, weight: .bold))
+                        Image(systemName: "wifi")
+                            .font(.system(size: 12))
+                        Image(systemName: "speaker.wave.2.fill")
+                            .font(.system(size: 12))
+                        Image(systemName: "battery.75percent")
+                            .font(.system(size: 15))
+
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text(Date.now, format: .dateTime.hour().minute())
+                                .font(.system(size: 10.5))
+                            Text(Date.now, format: .dateTime.day().month().year())
+                                .font(.system(size: 9.5))
+                        }
+
+                        Image(systemName: "bell")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundColor(.white.opacity(0.92))
+                    .padding(.horizontal, 10)
+                    .frame(height: 42)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-
-            TextField("Search apps", text: .constant(""))
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .frame(height: 38)
-                .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 12)], spacing: 16) {
-                StartApp(kind: .files, onOpen: onOpen)
-                StartApp(kind: .browser, onOpen: onOpen)
-                StartApp(kind: .settings, onOpen: onOpen)
-                StartApp(kind: .about, onOpen: onOpen)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.title2)
-                Text("HyperDroid")
-                    .font(.subheadline.weight(.medium))
-                Spacer()
-                Image(systemName: "power")
-                    .foregroundStyle(.secondary)
-            }
         }
-        .padding(22)
-        .frame(width: 430, height: 430)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.36), radius: 28, y: 10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.bottom, 62)
-        .onTapGesture {}
+        .frame(height: 48)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.09))
+                .frame(height: 1)
+        }
     }
 }
 
-struct StartApp: View {
+struct TaskbarAppButton: View {
     let kind: HyperWindowKind
+    let symbol: String
+    let windows: [HyperWindow]
+    let activeWindowID: UUID?
     let onOpen: (HyperWindowKind) -> Void
+    let onWindowTap: (UUID) -> Void
 
     var body: some View {
-        Button {
-            onOpen(kind)
-        } label: {
-            VStack(spacing: 8) {
-                Image(systemName: kind.symbol)
-                    .font(.system(size: 28, weight: .semibold))
-                    .frame(width: 54, height: 54)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        let matching = windows.first(where: { $0.kind == kind })
+        let selected = matching?.id == activeWindowID
 
-                Text(kind.title)
-                    .font(.caption)
-                    .lineLimit(1)
+        TaskbarSquare(selected: selected) {
+            if let matching {
+                onWindowTap(matching.id)
+            } else {
+                onOpen(kind)
             }
+        } content: {
+            Image(systemName: symbol)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundColor(kind == .files ? .yellow : .white.opacity(0.95))
+        }
+    }
+}
+
+struct TaskbarSquare<Content: View>: View {
+    let selected: Bool
+    let action: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Button(action: action) {
+            content()
+                .frame(width: 38, height: 38)
+                .background(selected ? Color.white.opacity(0.10) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(alignment: .bottom) {
+                    if selected {
+                        Capsule()
+                            .fill(Color.cyan)
+                            .frame(width: 16, height: 2)
+                            .offset(y: 1)
+                    }
+                }
         }
         .buttonStyle(.plain)
     }
 }
+
+struct WindowsLogo: View {
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                Rectangle().fill(Color(red: 0.0, green: 0.69, blue: 0.95))
+                Rectangle().fill(Color(red: 0.0, green: 0.69, blue: 0.95))
+            }
+            HStack(spacing: 2) {
+                Rectangle().fill(Color(red: 0.0, green: 0.69, blue: 0.95))
+                Rectangle().fill(Color(red: 0.0, green: 0.69, blue: 0.95))
+            }
+        }
+        .frame(width: 18, height: 18)
+    }
+}
+
+struct HyperStartMenu: View {
+    let onOpen: (HyperWindowKind) -> Void
+    let onPower: () -> Void
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 17) {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.white.opacity(0.78))
+                    Text("Type here to search")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.72))
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 38)
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
+
+                HStack {
+                    Text("Apps")
+                        .font(.system(size: 12.5, weight: .semibold))
+                    Spacer()
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 10))
+                        .frame(width: 38, height: 24)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                }
+
+                LazyVGrid(columns: columns, spacing: 15) {
+                    StartMenuApp("Camera", "camera.fill", Color.gray) {}
+                    StartMenuApp("Chrome", "globe", Color(red: 0.24, green: 0.55, blue: 0.96)) { onOpen(.browser) }
+                    StartMenuApp("Clock", "clock.fill", Color.black) {}
+                    StartMenuApp("Settings", "gearshape.fill", Color.gray) { onOpen(.settings) }
+                    StartMenuApp("Themes", "paintpalette.fill", Color.purple) { onOpen(.settings) }
+                    StartMenuApp("Play Store", "play.fill", Color.white) {}
+
+                    StartMenuApp("Gmail", "envelope.fill", Color.white) {}
+                    StartMenuApp("YouTube", "play.rectangle.fill", Color.red) { onOpen(.browser) }
+                    StartMenuApp("File Manager", "folder.fill", Color.yellow) { onOpen(.files) }
+                    StartMenuApp("Gallery", "photo.fill", Color.indigo) {}
+                    StartMenuApp("Services & f...", "questionmark.app.fill", Color.cyan) {}
+                    StartMenuApp("Calendar", "calendar", Color.white) {}
+
+                    StartMenuApp("Recorder", "waveform", Color(red: 0.2, green: 0.16, blue: 0.14)) {}
+                    StartMenuApp("Outlook", "envelope.badge.fill", Color.blue) {}
+                    StartMenuApp("Calculator", "plus.forwardslash.minus", Color.orange) {}
+                    StartMenuApp("Notes", "note.text", Color.orange) {}
+                    StartMenuApp("Weather", "cloud.sun.fill", Color.blue) {}
+                    StartMenuApp("Nova Launc...", "app.badge.fill", Color.cyan) {}
+                }
+
+                Spacer(minLength: 4)
+
+                Text("Recommended")
+                    .font(.system(size: 12.5, weight: .semibold))
+
+                Text("The more you use your device, we will show you new apps here.")
+                    .font(.system(size: 11.5))
+                    .foregroundColor(.white.opacity(0.58))
+
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 38)
+            .padding(.top, 18)
+
+            HStack {
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 23))
+                    Text("This PC")
+                        .font(.system(size: 12.5, weight: .medium))
+                }
+
+                Spacer()
+
+                Button(action: onPower) {
+                    Image(systemName: "power")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.92))
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 38)
+            .frame(height: 55)
+            .background(Color.black.opacity(0.20))
+        }
+        .foregroundColor(.white)
+        .frame(width: 500, height: 500)
+        .background(.ultraThinMaterial)
+        .environment(\.colorScheme, .dark)
+        .background(Color(red: 0.10, green: 0.12, blue: 0.14).opacity(0.76))
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.5), radius: 30, y: 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .padding(.bottom, 54)
+    }
+}
+
+struct StartMenuApp: View {
+    let name: String
+    let symbol: String
+    let color: Color
+    let action: () -> Void
+
+    init(_ name: String, _ symbol: String, _ color: Color, action: @escaping () -> Void) {
+        self.name = name
+        self.symbol = symbol
+        self.color = color
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 7)
+                        .fill(color.opacity(color == .white ? 0.96 : 0.88))
+                        .frame(width: 30, height: 30)
+
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(color == .white ? .black.opacity(0.75) : .white)
+                }
+
+                Text(name)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.white.opacity(0.92))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Quick settings
+
+struct QuickSettingsPanel: View {
+    @State private var volume = 0.62
+    @State private var wifi = true
+    @State private var bluetooth = true
+    @State private var darkTheme = true
+
+    var body: some View {
+        VStack(spacing: 16) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                QuickToggle("Wi-Fi", "wifi", $wifi)
+                QuickToggle("Internet", "network", .constant(true))
+                QuickToggle("Bluetooth", "bluetooth", $bluetooth)
+                QuickToggle("Nearby", "dot.radiowaves.left.and.right", .constant(false))
+                QuickToggle("Theme", "moon.fill", $darkTheme)
+                QuickToggle("Access", "figure.wave", .constant(false))
+            }
+
+            HStack(spacing: 12) {
+                Image(systemName: "speaker.wave.2.fill")
+                Slider(value: $volume)
+            }
+
+            HStack {
+                Text("93%")
+                    .font(.system(size: 12))
+                Image(systemName: "battery.100percent")
+                Spacer()
+                Text(Date.now, format: .dateTime.hour().minute())
+                    .font(.system(size: 12, weight: .medium))
+            }
+        }
+        .padding(18)
+        .frame(width: 340)
+        .background(.ultraThinMaterial)
+        .environment(\.colorScheme, .dark)
+        .background(Color(red: 0.12, green: 0.13, blue: 0.15).opacity(0.84))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.45), radius: 24, y: 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, 8)
+        .padding(.bottom, 55)
+    }
+}
+
+struct QuickToggle: View {
+    let title: String
+    let symbol: String
+    @Binding var isOn: Bool
+
+    init(_ title: String, _ symbol: String, _ isOn: Binding<Bool>) {
+        self.title = title
+        self.symbol = symbol
+        self._isOn = isOn
+    }
+
+    var body: some View {
+        Button {
+            isOn.toggle()
+        } label: {
+            VStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 52, height: 34)
+                    .background(isOn ? Color(red: 0.0, green: 0.47, blue: 0.84) : Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+
+                Text(title)
+                    .font(.system(size: 10))
+            }
+            .foregroundColor(.white)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - File Explorer
 
 struct FileExplorerPane: View {
     @State private var entries: [URL] = []
 
+    private let folders: [(String, String, Color)] = [
+        ("Documents", "doc.fill", .cyan),
+        ("Downloads", "arrow.down.square.fill", .mint),
+        ("Music", "music.note", .pink),
+        ("Pictures", "photo.fill", .blue),
+        ("Videos", "play.rectangle.fill", .purple)
+    ]
+
     var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Home", systemImage: "house.fill")
-                Label("Documents", systemImage: "doc.fill")
-                Label("Downloads", systemImage: "arrow.down.circle.fill")
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.left")
+                Image(systemName: "arrow.right")
+                    .foregroundColor(.white.opacity(0.35))
+                Image(systemName: "arrow.up")
+                HStack {
+                    Image(systemName: "desktopcomputer")
+                    Text("This PC")
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .background(Color.white.opacity(0.06))
+                .overlay(Rectangle().stroke(Color.white.opacity(0.08), lineWidth: 1))
                 Spacer()
             }
-            .font(.system(size: 13))
-            .padding(14)
-            .frame(width: 150, alignment: .leading)
-            .background(Color.white.opacity(0.035))
+            .font(.system(size: 12))
+            .padding(.horizontal, 10)
+            .frame(height: 42)
+            .background(Color(red: 0.09, green: 0.09, blue: 0.095))
 
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 16)], spacing: 18) {
-                    ForEach(entries, id: \.path) { url in
-                        VStack(spacing: 8) {
-                            Image(systemName: url.hasDirectoryPath ? "folder.fill" : "doc.fill")
-                                .font(.system(size: 30))
-                                .foregroundColor(url.hasDirectoryPath ? Color.yellow : Color.white.opacity(0.8))
-                            Text(url.lastPathComponent)
-                                .font(.caption)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(width: 96)
-                    }
-
-                    if entries.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "folder")
-                                .font(.system(size: 36))
-                                .foregroundStyle(.secondary)
-                            Text("No files yet")
-                                .font(.headline)
-                            Text("Files in HyperDroid's Documents folder will appear here.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(minWidth: 320, minHeight: 220)
-                    }
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    ExplorerSideRow("This PC", "desktopcomputer", selected: true)
+                    ExplorerSideRow("Documents", "doc.fill")
+                    ExplorerSideRow("Downloads", "arrow.down.circle.fill")
+                    ExplorerSideRow("Music", "music.note")
+                    Divider().opacity(0.18)
+                    ExplorerSideRow("Pictures", "photo.fill")
+                    ExplorerSideRow("Videos", "play.rectangle.fill")
+                    ExplorerSideRow("Internal (C:)", "externaldrive.fill")
+                    Spacer()
                 }
-                .padding(20)
+                .padding(.vertical, 10)
+                .frame(width: 165, alignment: .topLeading)
+                .background(Color.black.opacity(0.15))
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Folders (5)")
+                            .font(.system(size: 12.5, weight: .semibold))
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 165), spacing: 12)], spacing: 12) {
+                            ForEach(folders, id: \.0) { item in
+                                HStack(spacing: 12) {
+                                    Image(systemName: item.1)
+                                        .font(.system(size: 27))
+                                        .foregroundColor(item.2)
+                                        .frame(width: 36)
+
+                                    Text(item.0)
+                                        .font(.system(size: 12))
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 9)
+                                .frame(height: 48)
+                            }
+                        }
+
+                        Text("Devices and drives")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .padding(.top, 6)
+
+                        HStack(spacing: 12) {
+                            Image(systemName: "internaldrive.fill")
+                                .font(.system(size: 27))
+                                .foregroundColor(.gray)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Internal (C:)")
+                                    .font(.system(size: 12))
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle().fill(Color.white.opacity(0.8))
+                                        Rectangle().fill(Color(red: 0.0, green: 0.55, blue: 0.85))
+                                            .frame(width: geo.size.width * 0.65)
+                                    }
+                                }
+                                .frame(width: 150, height: 8)
+
+                                Text("23.7 GB free of 64.0 GB")
+                                    .font(.system(size: 9.5))
+                                    .foregroundColor(.white.opacity(0.55))
+                            }
+                        }
+
+                        if !entries.isEmpty {
+                            Divider().opacity(0.18)
+                            Text("HyperDroid Documents")
+                                .font(.system(size: 12.5, weight: .semibold))
+
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)]) {
+                                ForEach(entries, id: \.path) { url in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: url.hasDirectoryPath ? "folder.fill" : "doc.fill")
+                                            .foregroundColor(url.hasDirectoryPath ? .yellow : .white.opacity(0.75))
+                                        Text(url.lastPathComponent)
+                                            .font(.system(size: 10.5))
+                                            .lineLimit(1)
+                                        Spacer()
+                                    }
+                                    .padding(7)
+                                    .background(Color.white.opacity(0.04))
+                                }
+                            }
+                        }
+
+                        Spacer(minLength: 20)
+                    }
+                    .padding(14)
+                }
             }
         }
+        .foregroundColor(.white.opacity(0.94))
+        .background(Color(red: 0.055, green: 0.055, blue: 0.06))
         .onAppear(perform: refresh)
     }
 
@@ -566,7 +1018,6 @@ struct FileExplorerPane: View {
             entries = []
             return
         }
-
         entries = (try? FileManager.default.contentsOfDirectory(
             at: documents,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -575,55 +1026,170 @@ struct FileExplorerPane: View {
     }
 }
 
-struct SettingsPane: View {
-    @AppStorage("hyperdroid.density") private var density = 1.0
-    @AppStorage("hyperdroid.transparency") private var transparency = true
+struct ExplorerSideRow: View {
+    let title: String
+    let symbol: String
+    var selected = false
+
+    init(_ title: String, _ symbol: String, selected: Bool = false) {
+        self.title = title
+        self.symbol = symbol
+        self.selected = selected
+    }
 
     var body: some View {
-        Form {
-            Section("Display") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Desktop scale: \(density, specifier: "%.2f")x")
-                    Slider(value: $density, in: 0.8...1.3, step: 0.05)
-                }
-
-                Toggle("Glass effects", isOn: $transparency)
-            }
-
-            Section("Input") {
-                Label("Touch, trackpad, mouse and keyboard use standard iPadOS input.", systemImage: "cursorarrow.motionlines")
-            }
-
-            Section("Port status") {
-                LabeledContent("Desktop shell", value: "Working")
-                LabeledContent("Floating windows", value: "Working")
-                LabeledContent("Web apps", value: "Prototype")
-                LabeledContent("System launcher replacement", value: "Not available on iOS")
-            }
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+                .frame(width: 18)
+                .foregroundColor(selected ? .cyan : .white.opacity(0.8))
+            Text(title)
+                .font(.system(size: 11.5))
+            Spacer()
         }
+        .padding(.horizontal, 9)
+        .frame(height: 29)
+        .background(selected ? Color.white.opacity(0.08) : Color.clear)
     }
 }
 
-struct AboutPane: View {
+// MARK: - Settings
+
+struct SettingsPane: View {
+    @State private var selection = "Personalize"
+
+    private let nav: [(String, String)] = [
+        ("System", "display"),
+        ("Bluetooth & devices", "bluetooth"),
+        ("Personalize", "paintbrush.fill"),
+        ("Apps", "square.grid.2x2.fill"),
+        ("Accounts", "person.fill"),
+        ("Time & language", "clock.fill"),
+        ("Privacy & security", "shield.fill"),
+        ("PC Update", "arrow.triangle.2.circlepath")
+    ]
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "rectangle.3.group.fill")
-                .font(.system(size: 58))
-                .foregroundStyle(.cyan)
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 13))
+                    Text("Settings")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .padding(.bottom, 6)
 
-            Text("HyperDroid for iOS")
-                .font(.title2.bold())
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 36))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("This PC")
+                            .font(.system(size: 12, weight: .medium))
+                        Text("Local Account")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+                }
+                .padding(.vertical, 8)
 
-            Text("An iPad-first desktop-style shell inspired by the HyperDroid Android launcher.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: 420)
+                ForEach(nav, id: \.0) { item in
+                    Button {
+                        selection = item.0
+                    } label: {
+                        HStack(spacing: 9) {
+                            Image(systemName: item.1)
+                                .frame(width: 17)
+                                .foregroundColor(item.0 == "Personalize" ? .cyan : .white.opacity(0.78))
+                            Text(item.0)
+                                .font(.system(size: 11.5))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(height: 31)
+                        .background(selection == item.0 ? Color.white.opacity(0.08) : Color.clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                    .buttonStyle(.plain)
+                }
 
-            Text("Phase 1 • Native SwiftUI port")
-                .font(.footnote.monospaced())
-                .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(13)
+            .frame(width: 190, alignment: .topLeading)
+            .background(Color.black.opacity(0.12))
+
+            ScrollView {
+                if selection == "Personalize" {
+                    PersonalizeSettings()
+                } else {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text(selection)
+                            .font(.system(size: 23, weight: .semibold))
+                        SettingsCard(title: "HyperDroid iOS", subtitle: "This section will be connected to the iOS equivalent where possible.", symbol: "info.circle")
+                        Spacer()
+                    }
+                    .padding(20)
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
+        .foregroundColor(.white.opacity(0.95))
+        .background(Color(red: 0.08, green: 0.08, blue: 0.085))
+    }
+}
+
+struct PersonalizeSettings: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Personalize")
+                .font(.system(size: 23, weight: .semibold))
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.black)
+                Windows11Wallpaper()
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .padding(5)
+            }
+            .frame(width: 178, height: 102)
+
+            SettingsCard(title: "Background", subtitle: "Background image, color, slideshow", symbol: "photo")
+            SettingsCard(title: "Colors", subtitle: "Accent color, transparency effects, color theme", symbol: "paintpalette")
+            SettingsCard(title: "Start", subtitle: "Config StartMenu pattern and layout", symbol: "square.grid.2x2")
+            SettingsCard(title: "Taskbar", subtitle: "Taskbar behaviours, system pins", symbol: "rectangle.bottomhalf.inset.filled")
+
+            Spacer(minLength: 20)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct SettingsCard: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 17))
+                .frame(width: 25)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .medium))
+                Text(subtitle)
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.white.opacity(0.55))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 54)
+        .background(Color.white.opacity(0.075))
+        .overlay(
+            RoundedRectangle(cornerRadius: 3)
+                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 }
