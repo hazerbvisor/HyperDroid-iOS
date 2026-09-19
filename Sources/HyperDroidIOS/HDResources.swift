@@ -5,9 +5,9 @@ struct HDMetrics {
     let landscape: Bool
 
     // Windows 11-like compact shell scale on iPad.
-    var taskbarHeight: CGFloat { landscape ? 44 : 64 }
-    var taskbarAppSize: CGFloat { landscape ? 24 : 34 }
-    var taskbarButtonSize: CGFloat { landscape ? 44 : 54 }
+    var taskbarHeight: CGFloat { landscape ? 40 : 60 }
+    var taskbarAppSize: CGFloat { landscape ? 22 : 32 }
+    var taskbarButtonSize: CGFloat { landscape ? 40 : 50 }
     var taskbarAppPaddingHorizontal: CGFloat { landscape ? 4 : 7 }
     var taskbarMarginBottom: CGFloat { landscape ? 0 : 6 }
     var taskbarMarginHorizontal: CGFloat { landscape ? 0 : 10 }
@@ -19,7 +19,7 @@ struct HDMetrics {
     var startGridPaddingHorizontal: CGFloat { landscape ? 28 : 8 }
     var startRadius: CGFloat { landscape ? 10 : 14 }
     var startHeaderFontSize: CGFloat { landscape ? 12.8 : 15.4 }
-    var startMarginBottom: CGFloat { landscape ? 44 : 72 }
+    var startMarginBottom: CGFloat { landscape ? 40 : 68 }
     var startBodyPaddingHorizontal: CGFloat { landscape ? 44 : 26 }
     var startFooterPadding: CGFloat { landscape ? 8.6 : 6 }
     var startTitlePaddingHorizontal: CGFloat { landscape ? 50 : 26 }
