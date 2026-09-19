@@ -24,3 +24,23 @@ jobs:
             -framework WebKit
       - name: Validate XTool manifest
         run: python3 -m json.tool xtool-mobile.json >/dev/null
+      - name: Validate embedded XAPK atlas
+        run: |
+          python3 - <<'PY'
+          import base64, pathlib, re, struct
+
+          parts = []
+          for name in ["HDAtlasChunk0.swift", "HDAtlasChunk1.swift"]:
+              text = pathlib.Path("Sources/HyperDroidIOS", name).read_text()
+              match = re.search(r'static let value = "([^"]*)"', text)
+              assert match, f"missing atlas data in {name}"
+              parts.append(match.group(1))
+
+          encoded = "".join(parts)
+          encoded += "=" * ((4 - len(encoded) % 4) % 4)
+          raw = base64.b64decode(encoded, validate=True)
+          assert raw[:8] == b"\x89PNG\r\n\x1a\n", "atlas is not a PNG"
+          width, height = struct.unpack(">II", raw[16:24])
+          assert (width, height) == (384, 268), (width, height)
+          print(f"XAPK atlas OK: {width}x{height}, {len(raw)} bytes")
+          PY
