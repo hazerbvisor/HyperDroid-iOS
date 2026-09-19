@@ -1,12 +1,10 @@
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 struct HDSettingsView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var page = "Personalize"
     @State private var updateMessage = ""
-    @State private var importingCursorPack = false
     @State private var cursorImportMessage = ""
     @State private var cursorImportAlertPresented = false
     @ObservedObject private var cursorPack = HDCursorPackManager.shared
@@ -99,18 +97,6 @@ struct HDSettingsView: View {
             if pages.contains(value) {
                 page = value
             }
-        }
-        .sheet(isPresented: $importingCursorPack) {
-            HDCursorDocumentPicker(
-                onPick: { urls in
-                    importingCursorPack = false
-                    handleCursorImport(urls)
-                },
-                onCancel: {
-                    importingCursorPack = false
-                }
-            )
-            .ignoresSafeArea()
         }
         .alert(
             "Cursor Pack Import",
@@ -293,7 +279,31 @@ struct HDSettingsView: View {
                 "Import .cur files",
                 subtitle: "Select arrow.cur, hand.cur, ibeam.cur and the resize cursors from the extracted pack"
             ) {
-                importingCursorPack = true
+                HDCursorImportManager.shared.present { result in
+                    switch result {
+                    case .success(let imported):
+                        cursorPack.reload()
+                        if cursorPack.hasUsablePack {
+                            cursorStyle = "Windows 11"
+                        }
+
+                        if imported > 0 {
+                            let arrowNote = cursorPack.hasUsablePack
+                                ? " Windows 11 cursor mode is now active."
+                                : " Import arrow.cur as well to activate Windows 11 cursor mode."
+                            cursorImportMessage =
+                                "Imported \(imported) cursor file\(imported == 1 ? "" : "s")." + arrowNote
+                        } else {
+                            cursorImportMessage =
+                                "No supported .cur files were imported. Select the files directly from cursor/assets/light or cursor/assets/dark."
+                        }
+
+                    case .failure(let error):
+                        cursorImportMessage = "Import failed: \(error.localizedDescription)"
+                    }
+
+                    cursorImportAlertPresented = true
+                }
             }
 
             if cursorPack.hasUsablePack {
@@ -549,29 +559,6 @@ struct HDSettingsView: View {
                 updateMessage = "HyperDroid link copied"
             }
         }
-    }
-
-    private func handleCursorImport(_ urls: [URL]) {
-        do {
-            let imported = try cursorPack.importCursorFiles(urls)
-
-            if cursorPack.hasUsablePack {
-                cursorStyle = "Windows 11"
-            }
-
-            if imported > 0 {
-                let arrowNote = cursorPack.hasUsablePack
-                    ? " Windows 11 cursor mode is now active."
-                    : " Import arrow.cur as well to activate Windows 11 cursor mode."
-                cursorImportMessage = "Imported \(imported) cursor file\(imported == 1 ? "" : "s")." + arrowNote
-            } else {
-                cursorImportMessage = "No supported cursor files were imported. Select the .cur files directly from cursor/assets/light or cursor/assets/dark."
-            }
-        } catch {
-            cursorImportMessage = "Import failed: \(error.localizedDescription)"
-        }
-
-        cursorImportAlertPresented = true
     }
 
     private func settingsStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
