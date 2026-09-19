@@ -79,39 +79,59 @@ final class HDDesktopController: ObservableObject {
             startMenuVisible = false
             return
         }
+
         let availableHeight = max(360, desktop.height - taskbarHeight)
-        let size = CGSize(width: min(920, desktop.width * 0.82), height: min(640, availableHeight * 0.82))
-        let state = HDWindowState(kind: kind,
-                                  center: CGPoint(x: desktop.width / 2, y: availableHeight / 2),
-                                  size: size,
-                                  z: nextZ)
+        let size = CGSize(
+            width: min(920, desktop.width * 0.82),
+            height: min(640, availableHeight * 0.82)
+        )
+        let state = HDWindowState(
+            kind: kind,
+            center: CGPoint(x: desktop.width / 2, y: availableHeight / 2),
+            size: size,
+            z: nextZ
+        )
         nextZ += 1
-        windows.append(state)
-        activeWindowID = state.id
-        startMenuVisible = false
+
+        withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+            windows.append(state)
+            activeWindowID = state.id
+            startMenuVisible = false
+        }
     }
 
     func focus(_ id: UUID) {
         guard let i = windows.firstIndex(where: { $0.id == id }) else { return }
+        if activeWindowID == id { return }
         windows[i].z = nextZ
         nextZ += 1
         activeWindowID = id
     }
 
     func close(_ id: UUID) {
-        windows.removeAll { $0.id == id }
-        activeWindowID = windows.max(by: { $0.z < $1.z })?.id
+        withAnimation(.easeOut(duration: 0.16)) {
+            windows.removeAll { $0.id == id }
+            activeWindowID = windows.max(by: { $0.z < $1.z })?.id
+        }
     }
 
-    func move(_ id: UUID, by delta: CGSize) {
+    func move(_ id: UUID, by delta: CGSize, desktop: CGSize, taskbarHeight: CGFloat) {
         guard let i = windows.firstIndex(where: { $0.id == id }), !windows[i].maximized else { return }
-        windows[i].center.x += delta.width
-        windows[i].center.y += delta.height
+
+        let availableHeight = max(1, desktop.height - taskbarHeight)
+        let nextX = windows[i].center.x + delta.width
+        let nextY = windows[i].center.y + delta.height
+
+        // Keep enough of the title bar reachable while still allowing Windows-like edge dragging.
+        windows[i].center.x = min(max(nextX, 90), max(90, desktop.width - 90))
+        windows[i].center.y = min(max(nextY, 20), max(20, availableHeight - 20))
     }
 
     func toggleMaximize(_ id: UUID) {
         guard let i = windows.firstIndex(where: { $0.id == id }) else { return }
-        windows[i].maximized.toggle()
         focus(id)
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.90)) {
+            windows[i].maximized.toggle()
+        }
     }
 }
