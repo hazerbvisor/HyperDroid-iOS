@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import UIKit
 
 struct HDBrowserView: View {
     let onFocus: () -> Void
@@ -12,6 +13,8 @@ struct HDBrowserView: View {
     @State private var address = "https://www.google.com"
     @State private var currentURL = URL(string: "https://www.google.com")!
     @State private var dragStarted = false
+    @AppStorage("hd.webAccess") private var webAccess = true
+    @AppStorage("hd.defaultBrowser") private var defaultBrowser = "HyperDroid Browser"
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
@@ -95,8 +98,21 @@ struct HDBrowserView: View {
             .padding(.vertical, 8)
             .background(p.dialogBody)
 
-            HDWebView(url: currentURL)
-                .id(currentURL)
+            if webAccess {
+                HDWebView(url: currentURL)
+                    .id(currentURL)
+            } else {
+                VStack(spacing: 10) {
+                    Text("Network access is turned off")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(p.text)
+                    Text("Enable Web access in Settings > Privacy & security.")
+                        .font(.system(size: 13))
+                        .foregroundColor(p.mutedText)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(p.dialogBody)
+            }
         }
         .background(p.dialogBody)
     }
@@ -129,8 +145,12 @@ struct HDBrowserView: View {
             }
         }
         if let url = URL(string: value) {
-            currentURL = url
             address = value
+            if defaultBrowser == "External browser" {
+                UIApplication.shared.open(url)
+            } else {
+                currentURL = url
+            }
         }
     }
 
