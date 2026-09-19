@@ -8,6 +8,7 @@ struct HDSettingsView: View {
     @State private var updateMessage = ""
     @State private var importingCursorPack = false
     @State private var cursorImportMessage = ""
+    @State private var cursorImportAlertPresented = false
     @ObservedObject private var cursorPack = HDCursorPackManager.shared
     @AppStorage("hd.settingsRequestedPage") private var requestedPage = "Personalize"
 
@@ -99,12 +100,25 @@ struct HDSettingsView: View {
                 page = value
             }
         }
-        .fileImporter(
-            isPresented: $importingCursorPack,
-            allowedContentTypes: [UTType(filenameExtension: "cur") ?? .data],
-            allowsMultipleSelection: true
-        ) { result in
-            handleCursorImport(result)
+        .sheet(isPresented: $importingCursorPack) {
+            HDCursorDocumentPicker(
+                onPick: { urls in
+                    importingCursorPack = false
+                    handleCursorImport(urls)
+                },
+                onCancel: {
+                    importingCursorPack = false
+                }
+            )
+            .ignoresSafeArea()
+        }
+        .alert(
+            "Cursor Pack Import",
+            isPresented: $cursorImportAlertPresented
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(cursorImportMessage)
         }
     }
 
@@ -537,23 +551,27 @@ struct HDSettingsView: View {
         }
     }
 
-    private func handleCursorImport(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            do {
-                let imported = try cursorPack.importCursorFiles(urls)
-                if cursorPack.hasUsablePack {
-                    cursorStyle = "Windows 11"
-                }
-                cursorImportMessage = imported > 0
-                    ? "Imported \(imported) cursor files"
-                    : "No supported .cur files were selected"
-            } catch {
-                cursorImportMessage = error.localizedDescription
+    private func handleCursorImport(_ urls: [URL]) {
+        do {
+            let imported = try cursorPack.importCursorFiles(urls)
+
+            if cursorPack.hasUsablePack {
+                cursorStyle = "Windows 11"
             }
-        case .failure(let error):
-            cursorImportMessage = error.localizedDescription
+
+            if imported > 0 {
+                let arrowNote = cursorPack.hasUsablePack
+                    ? " Windows 11 cursor mode is now active."
+                    : " Import arrow.cur as well to activate Windows 11 cursor mode."
+                cursorImportMessage = "Imported \(imported) cursor file\(imported == 1 ? "" : "s")." + arrowNote
+            } else {
+                cursorImportMessage = "No supported cursor files were imported. Select the .cur files directly from cursor/assets/light or cursor/assets/dark."
+            }
+        } catch {
+            cursorImportMessage = "Import failed: \(error.localizedDescription)"
         }
+
+        cursorImportAlertPresented = true
     }
 
     private func settingsStack<Content: View>(@ViewBuilder content: () -> Content) -> some View {
