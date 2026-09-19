@@ -16,6 +16,7 @@ struct HDSettingsView: View {
 
     @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
     @AppStorage("hd.taskbarShowWidgets") private var taskbarShowWidgets = true
+    @AppStorage("hd.taskbarShowSearch") private var taskbarShowSearch = true
     @AppStorage("hd.taskbarShowClock") private var taskbarShowClock = true
     @AppStorage("hd.taskbarShowSeconds") private var taskbarShowSeconds = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
@@ -254,6 +255,7 @@ struct HDSettingsView: View {
                     values: ["Center", "Left"]
                 )
                 toggleRow("Widgets", subtitle: "Show the Widgets button", value: $taskbarShowWidgets)
+                toggleRow("Search", subtitle: "Show the Windows-style Search pill in the taskbar", value: $taskbarShowSearch)
                 toggleRow("Clock", subtitle: "Show time and date in the system tray", value: $taskbarShowClock)
                 toggleRow("Seconds", subtitle: "Show seconds in the taskbar clock", value: $taskbarShowSeconds)
                 toggleRow("Automatically hide", subtitle: "Hide the taskbar while desktop apps are active", value: $taskbarAutoHide)
