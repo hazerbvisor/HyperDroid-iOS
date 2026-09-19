@@ -1,35 +1,38 @@
 # HyperDroid iOS Port
 
-This branch is a native SwiftUI recreation of the public HyperDroid experience.
+This branch targets a faithful iOS recreation of the existing HyperDroid PC Launcher experience.
 
-The upstream public repository does not contain the Android application source code; it contains the README, screenshots/assets, privacy policy, and MIT license. Because there is no Android implementation to cross-compile, this port recreates the published behavior with iOS-native APIs.
+## Porting rule
 
-## Phase 1
+Do not redesign the HyperDroid interface.
 
-Implemented:
+The visual target is the existing HyperDroid Windows 11-style desktop shown by the upstream project's screenshots and shipped Android app:
 
-- iPad-first desktop shell
-- Start menu and taskbar
-- draggable/resizable in-app windows
-- File Explorer backed by the app Documents directory
-- WKWebView browser window for web apps
-- Settings/About windows
-- touch, pointer, mouse and keyboard compatibility through SwiftUI/UIKit
-- XTool Mobile build manifest
+- Windows 11-style centered taskbar
+- matching Start menu composition and proportions
+- Windows-style desktop shortcuts
+- HyperDroid File Explorer / This PC layout
+- HyperDroid Settings / Personalize layout
+- acrylic/dark Windows 11 surfaces
+- floating windows and desktop-oriented pointer behavior
+- UiChrome-style web window
 
-Not possible for a normal iOS app:
+Platform-specific Android behavior is replaced only where iOS requires it. The replacement should preserve the original visual language instead of inventing a new one.
 
-- becoming the iOS system/default launcher
-- enumerating every installed application
-- freely launching arbitrary installed applications by package identifier
+## iOS substitutions
 
-Those Android-only behaviors will be replaced with user-configured shortcuts, web apps, document providers, and supported URL schemes.
+A normal iOS app cannot become the actual SpringBoard launcher or enumerate all installed apps. HyperDroid for iOS therefore keeps the same desktop UI while mapping launchable entries to:
+
+- HyperDroid built-in apps/windows
+- web apps
+- user-configured URL schemes and shortcuts
+- Files/document-provider content where available
 
 ## XTool Mobile
 
-Open/import this branch in XTool Mobile and build using `xtool-mobile.json`.
+Open/import the `ios-port-v1` branch in XTool Mobile and build using `xtool-mobile.json`.
 
-The project targets iOS/iPadOS 16.0+ and uses only system frameworks:
+The current app uses system frameworks only:
 
 - SwiftUI
 - UIKit
