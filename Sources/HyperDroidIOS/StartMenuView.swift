@@ -30,7 +30,13 @@ struct HDStartMenuView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: height)
-            .background(p.startMenu.opacity(transparency ? 0.96 : 1.0))
+            .background {
+                HDGlassSurface(
+                    tint: p.startMenu,
+                    enabled: transparency,
+                    tintOpacity: scheme == .dark ? 0.62 : 0.78
+                )
+            }
             .clipShape(RoundedRectangle(cornerRadius: metrics.startRadius))
             .overlay(RoundedRectangle(cornerRadius: metrics.startRadius).stroke(p.border, lineWidth: 1))
             .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
