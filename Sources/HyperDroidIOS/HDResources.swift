@@ -44,7 +44,14 @@ struct HDPalette {
     var dialogBody: Color { scheme == .dark ? Color(hex: 0x272727) : Color(hex: 0xF9F9F9) }
     var border: Color { scheme == .dark ? Color(hex: 0x323232) : Color(hex: 0xCFCFCF) }
     var footer: Color { scheme == .dark ? Color.black.opacity(0.22) : Color(hex: 0xEAEAEA).opacity(0.30) }
-    var primary: Color { Color(red: 0.0, green: 0.47, blue: 0.84) }
+    var primary: Color {
+        switch UserDefaults.standard.string(forKey: "hd.accentColor") ?? "Blue" {
+        case "Purple": return Color(red: 0.56, green: 0.35, blue: 0.86)
+        case "Green": return Color(red: 0.12, green: 0.58, blue: 0.32)
+        case "Orange": return Color(red: 0.93, green: 0.48, blue: 0.10)
+        default: return Color(red: 0.0, green: 0.47, blue: 0.84)
+        }
+    }
 }
 
 extension Color {
