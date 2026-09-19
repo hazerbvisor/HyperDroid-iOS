@@ -81,10 +81,17 @@ final class HDDesktopController: ObservableObject {
         }
 
         let availableHeight = max(360, desktop.height - taskbarHeight)
+        let scale = CGFloat(UserDefaults.standard.double(forKey: "hd.displayScale") == 0 ? 100 : UserDefaults.standard.double(forKey: "hd.displayScale")) / 100.0
         let size = CGSize(
-            width: min(920, desktop.width * 0.82),
-            height: min(640, availableHeight * 0.82)
+            width: min(920, desktop.width * 0.82) * scale,
+            height: min(640, availableHeight * 0.82) * scale
         )
+
+        if UserDefaults.standard.object(forKey: "hd.multitasking") != nil,
+           !UserDefaults.standard.bool(forKey: "hd.multitasking") {
+            windows.removeAll()
+            activeWindowID = nil
+        }
         let state = HDWindowState(
             kind: kind,
             center: CGPoint(x: desktop.width / 2, y: availableHeight / 2),
