@@ -6,29 +6,36 @@ struct HDTaskbarView: View {
     let activeWindowID: UUID?
     let startMenuVisible: Bool
     let onToggleStart: () -> Void
+    let onSearch: () -> Void
     let onOpen: (HDAppEntry.Kind) -> Void
-    let onFocus: (UUID) -> Void
+    let onWindowAction: (UUID) -> Void
     let onToggleMore: () -> Void
     let onToggleActionCenter: () -> Void
     let onToggleCalendar: () -> Void
 
     @Environment(\.colorScheme) private var scheme
+    @ObservedObject private var system = HDSystemStatus.shared
+
     @AppStorage("hd.taskbarAlignment") private var alignment = "Center"
     @AppStorage("hd.taskbarShowWidgets") private var showWidgets = true
+    @AppStorage("hd.taskbarShowSearch") private var showSearch = true
     @AppStorage("hd.taskbarShowClock") private var showClock = true
     @AppStorage("hd.taskbarShowSeconds") private var showSeconds = false
     @AppStorage("hd.use24Hour") private var use24Hour = false
     @AppStorage("hd.transparency") private var transparency = true
-    @AppStorage("hd.accentColor") private var accentColor = "Blue"
 
     private var p: HDPalette { HDPalette(scheme: scheme) }
 
     var body: some View {
         ZStack {
-            p.taskbar.opacity(transparency ? 0.94 : 1.0)
+            HDGlassSurface(
+                tint: p.taskbar,
+                enabled: transparency,
+                tintOpacity: scheme == .dark ? 0.58 : 0.72
+            )
 
             Rectangle()
-                .fill(p.border.opacity(0.65))
+                .fill(p.border.opacity(0.55))
                 .frame(height: 1)
                 .frame(maxHeight: .infinity, alignment: .top)
 
@@ -44,15 +51,40 @@ struct HDTaskbarView: View {
                 }
             }
 
-            HStack(spacing: 2) {
+            HStack(spacing: 4) {
                 HDTaskbarIcon(
                     asset: "app_startmenu_btn",
                     iconSize: metrics.taskbarAppSize,
                     buttonSize: metrics.taskbarButtonSize,
                     active: startMenuVisible,
+                    minimized: false,
                     accent: p.primary,
                     action: onToggleStart
                 )
+
+                if showSearch {
+                    Button(action: onSearch) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Search")
+                                .font(.system(size: 12.5))
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundColor(p.text.opacity(0.88))
+                        .padding(.horizontal, 12)
+                        .frame(width: metrics.taskbarSearchWidth, height: metrics.taskbarSearchHeight)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(Color.white.opacity(scheme == .dark ? 0.10 : 0.55))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .stroke(p.border.opacity(0.42), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 ForEach([HDAppEntry.builtIns[1], HDAppEntry.builtIns[0], HDAppEntry.builtIns[2]]) { app in
                     let open = windows.first(where: { $0.kind.asset == app.asset })
@@ -60,21 +92,19 @@ struct HDTaskbarView: View {
                         asset: app.asset,
                         iconSize: metrics.taskbarAppSize,
                         buttonSize: metrics.taskbarButtonSize,
-                        active: open?.id == activeWindowID,
+                        active: open?.id == activeWindowID && open?.minimized == false,
+                        minimized: open?.minimized == true,
                         accent: p.primary
                     ) {
                         if let open {
-                            onFocus(open.id)
+                            onWindowAction(open.id)
                         } else {
                             onOpen(app.kind)
                         }
                     }
                 }
             }
-            .frame(
-                maxWidth: .infinity,
-                alignment: alignment == "Left" ? .leading : .center
-            )
+            .frame(maxWidth: .infinity, alignment: alignment == "Left" ? .leading : .center)
             .padding(.leading, alignment == "Left" ? (showWidgets ? metrics.taskbarButtonSize + 4 : 4) : 0)
 
             HStack(spacing: 0) {
@@ -89,13 +119,28 @@ struct HDTaskbarView: View {
                 .frame(width: 30, height: metrics.taskbarHeight)
 
                 Button(action: onToggleActionCenter) {
-                    HStack(spacing: 4) {
-                        HDImage(name: "ui_tb_globe_prohibited_24_regular", template: true, tint: p.text)
-                            .frame(width: 15, height: 15)
+                    HStack(spacing: 5) {
+                        HDImage(
+                            name: system.networkConnected ? "menu_ic_internet_20_regular" : "ui_tb_globe_prohibited_24_regular",
+                            template: true,
+                            tint: p.text
+                        )
+                        .frame(width: 15, height: 15)
+
                         HDImage(name: "ui_tb_speaker_2_24_regular", template: true, tint: p.text)
                             .frame(width: 15, height: 15)
-                        HDImage(name: "ui_tb_battery_10_24", template: true, tint: p.text)
-                            .frame(width: 15, height: 15)
+
+                        ZStack(alignment: .topTrailing) {
+                            HDImage(name: "ui_tb_battery_10_24", template: true, tint: p.text)
+                                .frame(width: 15, height: 15)
+
+                            if system.charging {
+                                Image(systemName: "bolt.fill")
+                                    .font(.system(size: 6, weight: .bold))
+                                    .foregroundColor(p.primary)
+                                    .offset(x: 3, y: -3)
+                            }
+                        }
                     }
                     .padding(.horizontal, 6)
                     .frame(height: metrics.taskbarHeight)
@@ -149,6 +194,7 @@ private struct HDTaskbarIcon: View {
     let iconSize: CGFloat
     let buttonSize: CGFloat
     let active: Bool
+    let minimized: Bool
     let accent: Color
     let action: () -> Void
 
@@ -160,11 +206,12 @@ private struct HDTaskbarIcon: View {
                     .frame(width: buttonSize, height: buttonSize)
 
                 Capsule()
-                    .fill(accent)
-                    .frame(width: active ? 16 : 0, height: 3)
-                    .opacity(active ? 1 : 0)
+                    .fill(active ? accent : Color.secondary.opacity(minimized ? 0.65 : 0.42))
+                    .frame(width: active ? 16 : (minimized ? 7 : 0), height: 3)
+                    .opacity(active || minimized ? 1 : 0)
                     .padding(.bottom, 2)
                     .animation(.easeOut(duration: 0.16), value: active)
+                    .animation(.easeOut(duration: 0.16), value: minimized)
             }
             .contentShape(Rectangle())
         }
