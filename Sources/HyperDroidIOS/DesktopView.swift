@@ -12,15 +12,17 @@ struct DesktopView: View {
     @AppStorage("hd.theme") private var theme = "Dark"
     @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Windows 11"
     @AppStorage("hd.wallpaperDefaultMigrated") private var wallpaperDefaultMigrated = false
+    @AppStorage("hd.displayScale") private var displayScale = 100.0
     @AppStorage("hd.nightLight") private var nightLight = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
     @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
     @AppStorage("hd.cursorStyle") private var cursorStyle = "iPadOS"
     @ObservedObject private var cursorPack = HDCursorPackManager.shared
+    @ObservedObject private var wallpaper = HDWallpaperManager.shared
 
     var body: some View {
         GeometryReader { geo in
-            let metrics = HDMetrics.forSize(geo.size)
+            let metrics = HDMetrics.forSize(geo.size, scalePercent: displayScale)
             let shouldHideTaskbar = taskbarAutoHide
                 && controller.activeWindowID != nil
                 && !taskbarPeek
@@ -41,11 +43,12 @@ struct DesktopView: View {
 
                 desktopIcons(geo.size, metrics)
 
-                ForEach(controller.windows.filter { !$0.minimized }.sorted(by: { $0.z < $1.z })) { window in
+                ForEach(controller.windows.sorted(by: { $0.z < $1.z })) { window in
                     HDWindowView(
                         state: window,
                         desktopSize: geo.size,
                         taskbarHeight: metrics.taskbarHeight,
+                        displayScale: metrics.scale,
                         active: controller.activeWindowID == window.id,
                         onFocus: { controller.focus(window.id) },
                         onMinimize: { controller.minimize(window.id) },
@@ -60,11 +63,17 @@ struct DesktopView: View {
                         },
                         onMaximize: { controller.toggleMaximize(window.id) }
                     )
+                    .scaleEffect(window.minimized ? 0.72 : 1.0, anchor: .center)
+                    .opacity(window.minimized ? 0 : 1)
+                    .offset(y: window.minimized ? max(48, geo.size.height * 0.16) : 0)
+                    .allowsHitTesting(!window.minimized)
+                    .accessibilityHidden(window.minimized)
+                    .animation(.easeInOut(duration: 0.20), value: window.minimized)
                     .zIndex(Double(window.z))
                     .transition(
                         .asymmetric(
                             insertion: .scale(scale: 0.94).combined(with: .opacity),
-                            removal: .move(edge: .bottom).combined(with: .scale(scale: 0.86)).combined(with: .opacity)
+                            removal: .scale(scale: 0.70, anchor: .center).combined(with: .opacity)
                         )
                     )
                 }
@@ -227,6 +236,7 @@ struct DesktopView: View {
             }
             .ignoresSafeArea(.container, edges: .all)
         }
+        .ignoresSafeArea(.container, edges: .all)
         .preferredColorScheme(preferredScheme)
         .onAppear {
             if !wallpaperDefaultMigrated {
@@ -255,6 +265,17 @@ struct DesktopView: View {
                 withExtension: "jpg"
             ),
                let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            } else {
+                Color(red: 0.02, green: 0.20, blue: 0.42)
+            }
+
+        case "Custom":
+            if let image = wallpaper.image {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -305,9 +326,10 @@ struct DesktopView: View {
                 controller.open(.explorer, desktop: size, taskbarHeight: metrics.taskbarHeight)
             } label: {
                 VStack(spacing: 0) {
-                    HDImage(name: "img_app_explorer").frame(width: 46, height: 46)
+                    HDImage(name: "img_app_explorer")
+                        .frame(width: 46 * metrics.scale, height: 46 * metrics.scale)
                     Text("This PC")
-                        .font(.system(size: 12))
+                        .font(.system(size: 12 * metrics.scale))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -316,7 +338,7 @@ struct DesktopView: View {
                         .padding(.bottom, 4)
                 }
                 .padding(.top, 4)
-                .frame(width: 90)
+                .frame(width: 90 * metrics.scale)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -355,6 +377,7 @@ private struct HDWindowView: View {
     let state: HDWindowState
     let desktopSize: CGSize
     let taskbarHeight: CGFloat
+    let displayScale: CGFloat
     let active: Bool
     let onFocus: () -> Void
     let onMinimize: () -> Void
@@ -369,9 +392,18 @@ private struct HDWindowView: View {
     private var palette: HDPalette { HDPalette(scheme: scheme) }
 
     private var size: CGSize {
-        state.maximized
-            ? CGSize(width: desktopSize.width, height: desktopSize.height - taskbarHeight)
-            : state.size
+        if state.maximized {
+            return CGSize(
+                width: desktopSize.width,
+                height: max(1, desktopSize.height - taskbarHeight)
+            )
+        }
+
+        let availableHeight = max(1, desktopSize.height - taskbarHeight)
+        return CGSize(
+            width: min(state.size.width * displayScale, desktopSize.width * 0.96),
+            height: min(state.size.height * displayScale, availableHeight * 0.96)
+        )
     }
 
     private var center: CGPoint {
