@@ -52,7 +52,7 @@ struct HDTaskbarView: View {
                 }
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: 4 * metrics.scale) {
                 HDStartTaskbarButton(
                     asset: "app_startmenu_btn",
                     iconSize: metrics.taskbarAppSize,
@@ -65,20 +65,20 @@ struct HDTaskbarView: View {
                     Button(action: onSearch) {
                         HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 13 * metrics.scale, weight: .medium))
                             Text("Search")
-                                .font(.system(size: 12.5))
+                                .font(.system(size: 12.5 * metrics.scale))
                             Spacer(minLength: 0)
                         }
                         .foregroundColor(p.text.opacity(0.88))
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 12 * metrics.scale)
                         .frame(width: metrics.taskbarSearchWidth, height: metrics.taskbarSearchHeight)
                         .background(
-                            RoundedRectangle(cornerRadius: 7)
+                            RoundedRectangle(cornerRadius: 7 * metrics.scale)
                                 .fill(Color.white.opacity(scheme == .dark ? 0.10 : 0.55))
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 7)
+                            RoundedRectangle(cornerRadius: 7 * metrics.scale)
                                 .stroke(p.border.opacity(0.42), lineWidth: 1)
                         )
                     }
@@ -87,7 +87,7 @@ struct HDTaskbarView: View {
                 } else if searchMode == "Search icon" {
                     Button(action: onSearch) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 14 * metrics.scale, weight: .medium))
                             .foregroundColor(p.text)
                             .frame(width: metrics.taskbarButtonSize, height: metrics.taskbarButtonSize)
                     }
@@ -122,36 +122,36 @@ struct HDTaskbarView: View {
 
                 HDBitmapButton(
                     asset: "ui_taskbar_btn_more",
-                    size: 15,
+                    size: 15 * metrics.scale,
                     p: p,
                     action: onToggleMore
                 )
-                .frame(width: 30, height: metrics.taskbarHeight)
+                .frame(width: 30 * metrics.scale, height: metrics.taskbarHeight)
 
                 Button(action: onToggleActionCenter) {
                     HStack(spacing: 5) {
                         Image(systemName: networkSymbol)
-                            .font(.system(size: 13, weight: .medium))
-                            .frame(width: 15, height: 15)
+                            .font(.system(size: 13 * metrics.scale, weight: .medium))
+                            .frame(width: 15 * metrics.scale, height: 15 * metrics.scale)
 
                         Image(systemName: system.outputVolume < 0.01 ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 12, weight: .medium))
-                            .frame(width: 15, height: 15)
+                            .font(.system(size: 12 * metrics.scale, weight: .medium))
+                            .frame(width: 15 * metrics.scale, height: 15 * metrics.scale)
 
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: batterySymbol)
-                                .font(.system(size: 14, weight: .medium))
-                                .frame(width: 18, height: 15)
+                                .font(.system(size: 14 * metrics.scale, weight: .medium))
+                                .frame(width: 18 * metrics.scale, height: 15 * metrics.scale)
 
                             if system.charging {
                                 Image(systemName: "bolt.fill")
-                                    .font(.system(size: 6, weight: .bold))
+                                    .font(.system(size: 6 * metrics.scale, weight: .bold))
                                     .foregroundColor(p.primary)
                                     .offset(x: 3, y: -3)
                             }
                         }
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 6 * metrics.scale)
                     .frame(height: metrics.taskbarHeight)
                     .contentShape(Rectangle())
                 }
@@ -166,14 +166,14 @@ struct HDTaskbarView: View {
                                     Text(clockText(context.date))
                                     Text(context.date, format: .dateTime.day().month().year())
                                 }
-                                .font(.system(size: 9.5))
+                                .font(.system(size: 9.5 * metrics.scale))
                             }
 
                             HDImage(name: "ui_tb_alert_24_regular", template: true, tint: p.text)
-                                .frame(width: 15, height: 15)
+                                .frame(width: 15 * metrics.scale, height: 15 * metrics.scale)
                         }
-                        .padding(.leading, 6)
-                        .padding(.trailing, 7)
+                        .padding(.leading, 6 * metrics.scale)
+                        .padding(.trailing, 7 * metrics.scale)
                         .frame(height: metrics.taskbarHeight)
                         .contentShape(Rectangle())
                     }
