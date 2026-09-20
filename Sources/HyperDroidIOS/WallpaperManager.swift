@@ -1,7 +1,6 @@
 import SwiftUI
 import UIKit
 
-@MainActor
 final class HDWallpaperManager: ObservableObject {
     static let shared = HDWallpaperManager()
 
