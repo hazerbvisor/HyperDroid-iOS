@@ -120,7 +120,7 @@ struct HDExplorerView: View {
             .overlay(Rectangle().stroke(p.border.opacity(0.7), lineWidth: 1))
             .frame(width: 210)
 
-            if case .folder = model.location {
+            if case .folder(_) = model.location {
                 Button {
                     newFolderName = "New folder"
                     showingNewFolder = true
@@ -132,7 +132,6 @@ struct HDExplorerView: View {
                 }
                 .buttonStyle(.plain)
                 .hdCursor(.hand)
-                .help("New folder")
             }
         }
         .padding(.horizontal, 6)
