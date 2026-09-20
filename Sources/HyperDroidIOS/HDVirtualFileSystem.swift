@@ -213,7 +213,7 @@ final class HDHostMappedFileSystemProvider: HDFileSystemProvider {
     func hostURL(for virtualPath: String) throws -> URL {
         let normalized = Self.normalizeVirtualPath(virtualPath)
         guard normalized.count >= 2,
-              normalized.prefix(2).caseInsensitiveCompare(driveLetter) == .orderedSame else {
+              String(normalized.prefix(2)).caseInsensitiveCompare(driveLetter) == .orderedSame else {
             throw HDVFSError.invalidPath(virtualPath)
         }
 
@@ -249,7 +249,7 @@ final class HDHostMappedFileSystemProvider: HDFileSystemProvider {
 
         if path.isEmpty { return "C:\\" }
         if path.caseInsensitiveCompare("C:") == .orderedSame { return "C:\\" }
-        if path.count >= 2, path.prefix(2).caseInsensitiveCompare("C:") == .orderedSame {
+        if path.count >= 2, String(path.prefix(2)).caseInsensitiveCompare("C:") == .orderedSame {
             path = "C:" + path.dropFirst(2)
         }
         if path.count == 2 { path += "\\" }
@@ -495,5 +495,22 @@ final class HDExplorerModel: ObservableObject {
         location = destination
         searchText = ""
         reload()
+    }
+}
+
+
+/// Stable integration seam used by WinPad when HyperDroid is embedded as its
+/// desktop shell. WinPad supplies the active bottle's real drive_c URL.
+@MainActor
+enum HDFileSystemBridge {
+    static func useVirtualDriveC(at rootURL: URL, displayName: String = "Local Disk") {
+        HDVirtualFileSystem.shared.configureDriveC(
+            rootURL: rootURL,
+            displayName: displayName
+        )
+    }
+
+    static func useStandaloneStorage() {
+        HDVirtualFileSystem.shared.resetToStandaloneStorage()
     }
 }
