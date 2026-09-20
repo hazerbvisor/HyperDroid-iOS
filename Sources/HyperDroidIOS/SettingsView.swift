@@ -13,7 +13,7 @@ struct HDSettingsView: View {
 
     @AppStorage("hd.theme") private var theme = "Dark"
     @AppStorage("hd.transparency") private var transparency = true
-    @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Black"
+    @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Windows 11"
     @AppStorage("hd.accentColor") private var accentColor = "Blue"
 
     @AppStorage("hd.startShowSearch") private var startShowSearch = true
@@ -350,7 +350,7 @@ struct HDSettingsView: View {
                     "Desktop background",
                     subtitle: "Choose the HyperDroid desktop background",
                     selection: $backgroundStyle,
-                    values: ["Black", "Windows Blue", "Gradient"]
+                    values: ["Windows 11", "Black", "Windows Blue", "Gradient"]
                 )
             }
 
