@@ -83,11 +83,9 @@ final class HDDesktopController: ObservableObject {
         }
 
         let availableHeight = max(360, desktop.height - taskbarHeight)
-        let storedScale = UserDefaults.standard.double(forKey: "hd.displayScale")
-        let scale = CGFloat(storedScale == 0 ? 100 : storedScale) / 100.0
         let size = CGSize(
-            width: min(920, desktop.width * 0.82) * scale,
-            height: min(640, availableHeight * 0.82) * scale
+            width: min(920, desktop.width * 0.82),
+            height: min(640, availableHeight * 0.82)
         )
 
         if UserDefaults.standard.object(forKey: "hd.multitasking") != nil,
@@ -121,7 +119,7 @@ final class HDDesktopController: ObservableObject {
 
     func minimize(_ id: UUID) {
         guard let i = windows.firstIndex(where: { $0.id == id }), !windows[i].minimized else { return }
-        withAnimation(.easeInOut(duration: 0.18)) {
+        withAnimation(.easeInOut(duration: 0.20)) {
             windows[i].minimized = true
             if activeWindowID == id {
                 activeWindowID = topVisibleWindow(excluding: id)?.id
@@ -151,7 +149,7 @@ final class HDDesktopController: ObservableObject {
     }
 
     func close(_ id: UUID) {
-        withAnimation(.easeOut(duration: 0.16)) {
+        withAnimation(.easeIn(duration: 0.22)) {
             windows.removeAll { $0.id == id }
             if activeWindowID == id {
                 activeWindowID = topVisibleWindow(excluding: id)?.id
