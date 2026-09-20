@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 struct HDSettingsView: View {
     @Environment(\.colorScheme) private var scheme
@@ -8,7 +9,10 @@ struct HDSettingsView: View {
     @State private var cursorImportMessage = ""
     @State private var cursorImportAlertPresented = false
     @State private var cursorInstallBusy = false
+    @State private var wallpaperItem: PhotosPickerItem?
+    @State private var wallpaperMessage = ""
     @ObservedObject private var cursorPack = HDCursorPackManager.shared
+    @ObservedObject private var wallpaper = HDWallpaperManager.shared
     @AppStorage("hd.settingsRequestedPage") private var requestedPage = "Personalize"
 
     @AppStorage("hd.theme") private var theme = "Dark"
@@ -98,6 +102,32 @@ struct HDSettingsView: View {
         .onChange(of: requestedPage) { value in
             if pages.contains(value) {
                 page = value
+            }
+        }
+        .onChange(of: wallpaperItem) { item in
+            guard let item else { return }
+
+            Task {
+                do {
+                    guard let data = try await item.loadTransferable(type: Data.self) else {
+                        await MainActor.run {
+                            wallpaperMessage = "Could not read the selected image."
+                        }
+                        return
+                    }
+
+                    try await MainActor.run {
+                        try wallpaper.install(data: data)
+                        backgroundStyle = "Custom"
+                        wallpaperMessage = "Custom wallpaper applied."
+                        wallpaperItem = nil
+                    }
+                } catch {
+                    await MainActor.run {
+                        wallpaperMessage = "Wallpaper import failed: \(error.localizedDescription)"
+                        wallpaperItem = nil
+                    }
+                }
             }
         }
         .alert(
@@ -350,8 +380,75 @@ struct HDSettingsView: View {
                     "Desktop background",
                     subtitle: "Choose the HyperDroid desktop background",
                     selection: $backgroundStyle,
-                    values: ["Windows 11", "Black", "Windows Blue", "Gradient"]
+                    values: ["Windows 11", "Custom", "Black", "Windows Blue", "Gradient"]
                 )
+
+                PhotosPicker(selection: $wallpaperItem, matching: .images) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Choose custom wallpaper")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(p.text)
+                            Text("Pick an image from your Photos library")
+                                .font(.system(size: 10.8))
+                                .foregroundColor(p.mutedText)
+                        }
+
+                        Spacer()
+
+                        Text("Choose")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(p.primary)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 58)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .hdCursor(.hand)
+                .overlay(divider, alignment: .bottom)
+
+                if wallpaper.hasCustomWallpaper {
+                    Button {
+                        do {
+                            try wallpaper.clear()
+                            if backgroundStyle == "Custom" {
+                                backgroundStyle = "Windows 11"
+                            }
+                            wallpaperMessage = "Custom wallpaper removed."
+                        } catch {
+                            wallpaperMessage = error.localizedDescription
+                        }
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Remove custom wallpaper")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(p.text)
+                                Text("Return to the built-in Windows 11 wallpaper")
+                                    .font(.system(size: 10.8))
+                                    .foregroundColor(p.mutedText)
+                            }
+
+                            Spacer()
+
+                            Text("Remove")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.red)
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 58)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .hdCursor(.hand)
+                }
+            }
+
+            if !wallpaperMessage.isEmpty {
+                settingsSection("Wallpaper status") {
+                    infoRow("Status", value: wallpaperMessage)
+                }
             }
 
             settingsSection("Colors") {
