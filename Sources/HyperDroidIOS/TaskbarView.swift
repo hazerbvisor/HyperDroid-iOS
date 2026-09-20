@@ -53,13 +53,11 @@ struct HDTaskbarView: View {
             }
 
             HStack(spacing: 4) {
-                HDTaskbarIcon(
+                HDStartTaskbarButton(
                     asset: "app_startmenu_btn",
                     iconSize: metrics.taskbarAppSize,
                     buttonSize: metrics.taskbarButtonSize,
                     active: startMenuVisible,
-                    minimized: false,
-                    accent: p.primary,
                     action: onToggleStart
                 )
 
@@ -103,6 +101,7 @@ struct HDTaskbarView: View {
                         asset: app.asset,
                         iconSize: metrics.taskbarAppSize,
                         buttonSize: metrics.taskbarButtonSize,
+                        running: open != nil,
                         active: open?.id == activeWindowID && open?.minimized == false,
                         minimized: open?.minimized == true,
                         accent: p.primary
@@ -221,10 +220,68 @@ struct HDTaskbarView: View {
     }
 }
 
+
+private struct HDStartTaskbarButton: View {
+    let asset: String
+    let iconSize: CGFloat
+    let buttonSize: CGFloat
+    let active: Bool
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HDImage(name: asset)
+                .frame(width: iconSize, height: iconSize)
+                .frame(width: buttonSize, height: buttonSize)
+                .contentShape(Rectangle())
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            Color.white.opacity(
+                                active
+                                    ? (scheme == .dark ? 0.12 : 0.42)
+                                    : (hovering ? (scheme == .dark ? 0.08 : 0.28) : 0)
+                            )
+                        )
+                )
+        }
+        .buttonStyle(HDStartPressStyle(active: active))
+        .onHover { hovering = $0 }
+        .hdCursor(.hand)
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(.spring(response: 0.28, dampingFraction: 0.68), value: active)
+    }
+}
+
+private struct HDStartPressStyle: ButtonStyle {
+    let active: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(
+                configuration.isPressed
+                    ? 0.84
+                    : (active ? 1.04 : 1.0)
+            )
+            .animation(
+                .spring(response: 0.22, dampingFraction: 0.58),
+                value: configuration.isPressed
+            )
+            .animation(
+                .spring(response: 0.30, dampingFraction: 0.62),
+                value: active
+            )
+    }
+}
+
 private struct HDTaskbarIcon: View {
     let asset: String
     let iconSize: CGFloat
     let buttonSize: CGFloat
+    let running: Bool
     let active: Bool
     let minimized: Bool
     let accent: Color
@@ -238,12 +295,13 @@ private struct HDTaskbarIcon: View {
                     .frame(width: buttonSize, height: buttonSize)
 
                 Capsule()
-                    .fill(active ? accent : Color.secondary.opacity(minimized ? 0.65 : 0.42))
-                    .frame(width: active ? 16 : (minimized ? 7 : 0), height: 3)
-                    .opacity(active || minimized ? 1 : 0)
+                    .fill(active ? accent : Color.secondary.opacity(minimized ? 0.68 : 0.58))
+                    .frame(width: active ? 16 : (running ? 7 : 0), height: 3)
+                    .opacity(running ? 1 : 0)
                     .padding(.bottom, 2)
-                    .animation(.easeOut(duration: 0.16), value: active)
-                    .animation(.easeOut(duration: 0.16), value: minimized)
+                    .animation(.spring(response: 0.22, dampingFraction: 0.82), value: active)
+                    .animation(.easeOut(duration: 0.14), value: running)
+                    .animation(.easeOut(duration: 0.14), value: minimized)
             }
             .contentShape(Rectangle())
         }
