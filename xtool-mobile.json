@@ -20,7 +20,8 @@
     "WebKit",
     "AVFoundation",
     "MediaPlayer",
-    "Network"
+    "Network",
+    "PhotosUI"
   ],
   "resources": [
     {
