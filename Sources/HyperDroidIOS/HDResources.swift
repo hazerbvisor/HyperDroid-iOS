@@ -3,33 +3,43 @@ import UIKit
 
 struct HDMetrics {
     let landscape: Bool
+    let scale: CGFloat
 
-    // Windows 11-like compact shell scale on iPad.
-    var taskbarHeight: CGFloat { landscape ? 40 : 60 }
-    var taskbarAppSize: CGFloat { landscape ? 22 : 32 }
-    var taskbarButtonSize: CGFloat { landscape ? 40 : 50 }
-    var taskbarSearchWidth: CGFloat { landscape ? 152 : 132 }
-    var taskbarSearchHeight: CGFloat { landscape ? 30 : 38 }
-    var taskbarAppPaddingHorizontal: CGFloat { landscape ? 4 : 7 }
-    var taskbarMarginBottom: CGFloat { landscape ? 0 : 6 }
-    var taskbarMarginHorizontal: CGFloat { landscape ? 0 : 10 }
+    private func scaled(_ value: CGFloat) -> CGFloat {
+        value * scale
+    }
 
-    var startAppIconSize: CGFloat { landscape ? 32 : 48 }
-    var startAppWidth: CGFloat { landscape ? 76 : 80 }
-    var startAppHeight: CGFloat { landscape ? 74 : 80 }
-    var startGridHeight: CGFloat { landscape ? 222 : 320 }
-    var startGridPaddingHorizontal: CGFloat { landscape ? 28 : 8 }
-    var startRadius: CGFloat { landscape ? 10 : 14 }
-    var startHeaderFontSize: CGFloat { landscape ? 12.8 : 15.4 }
-    var startMarginBottom: CGFloat { landscape ? 40 : 68 }
-    var startBodyPaddingHorizontal: CGFloat { landscape ? 44 : 26 }
-    var startFooterPadding: CGFloat { landscape ? 8.6 : 6 }
-    var startTitlePaddingHorizontal: CGFloat { landscape ? 50 : 26 }
-    var startMaxHeight: CGFloat { 600 }
-    var startMinHeight: CGFloat { 418 }
+    // Windows 11-like shell dimensions. Display scale now affects the live shell,
+    // including the taskbar and Start UI, instead of only newly opened windows.
+    var taskbarHeight: CGFloat { scaled(landscape ? 40 : 60) }
+    var taskbarAppSize: CGFloat { scaled(landscape ? 22 : 32) }
+    var taskbarButtonSize: CGFloat { scaled(landscape ? 40 : 50) }
+    var taskbarSearchWidth: CGFloat { scaled(landscape ? 152 : 132) }
+    var taskbarSearchHeight: CGFloat { scaled(landscape ? 30 : 38) }
+    var taskbarAppPaddingHorizontal: CGFloat { scaled(landscape ? 4 : 7) }
+    var taskbarMarginBottom: CGFloat { scaled(landscape ? 0 : 6) }
+    var taskbarMarginHorizontal: CGFloat { scaled(landscape ? 0 : 10) }
 
-    static func forSize(_ size: CGSize) -> HDMetrics {
-        HDMetrics(landscape: size.width > size.height)
+    var startAppIconSize: CGFloat { scaled(landscape ? 32 : 48) }
+    var startAppWidth: CGFloat { scaled(landscape ? 76 : 80) }
+    var startAppHeight: CGFloat { scaled(landscape ? 74 : 80) }
+    var startGridHeight: CGFloat { scaled(landscape ? 222 : 320) }
+    var startGridPaddingHorizontal: CGFloat { scaled(landscape ? 28 : 8) }
+    var startRadius: CGFloat { scaled(landscape ? 10 : 14) }
+    var startHeaderFontSize: CGFloat { scaled(landscape ? 12.8 : 15.4) }
+    var startMarginBottom: CGFloat { taskbarHeight }
+    var startBodyPaddingHorizontal: CGFloat { scaled(landscape ? 44 : 26) }
+    var startFooterPadding: CGFloat { scaled(landscape ? 8.6 : 6) }
+    var startTitlePaddingHorizontal: CGFloat { scaled(landscape ? 50 : 26) }
+    var startMaxHeight: CGFloat { scaled(600) }
+    var startMinHeight: CGFloat { scaled(418) }
+
+    static func forSize(_ size: CGSize, scalePercent: Double = 100) -> HDMetrics {
+        let safePercent = min(max(scalePercent, 80), 125)
+        return HDMetrics(
+            landscape: size.width > size.height,
+            scale: CGFloat(safePercent / 100.0)
+        )
     }
 }
 
