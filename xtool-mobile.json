@@ -26,6 +26,10 @@
     {
       "path": "Resources/hyperdroid_ui_atlas.png",
       "destination": "hyperdroid_ui_atlas.png"
+    },
+    {
+      "path": "Resources/hyperdroid_default_wallpaper.jpg",
+      "destination": "hyperdroid_default_wallpaper.jpg"
     }
   ],
   "infoPlist": "HyperDroidIOSInfo.plist",
