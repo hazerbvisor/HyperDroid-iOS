@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct DesktopView: View {
     @StateObject private var controller = HDDesktopController()
@@ -9,7 +10,8 @@ struct DesktopView: View {
     @State private var taskbarPeek = false
     @Environment(\.colorScheme) private var scheme
     @AppStorage("hd.theme") private var theme = "Dark"
-    @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Black"
+    @AppStorage("hd.backgroundStyle") private var backgroundStyle = "Windows 11"
+    @AppStorage("hd.wallpaperDefaultMigrated") private var wallpaperDefaultMigrated = false
     @AppStorage("hd.nightLight") private var nightLight = false
     @AppStorage("hd.taskbarAutoHide") private var taskbarAutoHide = false
     @AppStorage("hd.taskbarAlignment") private var taskbarAlignment = "Center"
@@ -29,7 +31,7 @@ struct DesktopView: View {
                 && !searchVisible
 
             ZStack(alignment: .bottom) {
-                desktopBackground.ignoresSafeArea()
+                desktopBackground(size: geo.size).ignoresSafeArea()
 
                 if nightLight {
                     Color.orange.opacity(0.08)
@@ -79,7 +81,15 @@ struct DesktopView: View {
                         open(app.kind, in: geo.size, metrics: metrics)
                     }
                     .padding(.bottom, metrics.startMarginBottom)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(
+                        .asymmetric(
+                            insertion: .scale(scale: 0.94, anchor: .bottom)
+                                .combined(with: .move(edge: .bottom))
+                                .combined(with: .opacity),
+                            removal: .scale(scale: 0.97, anchor: .bottom)
+                                .combined(with: .opacity)
+                        )
+                    )
                     .zIndex(10000)
                 }
 
@@ -218,6 +228,14 @@ struct DesktopView: View {
             .ignoresSafeArea(.container, edges: .all)
         }
         .preferredColorScheme(preferredScheme)
+        .onAppear {
+            if !wallpaperDefaultMigrated {
+                if backgroundStyle == "Black" {
+                    backgroundStyle = "Windows 11"
+                }
+                wallpaperDefaultMigrated = true
+            }
+        }
     }
 
     private var preferredScheme: ColorScheme? {
@@ -229,10 +247,26 @@ struct DesktopView: View {
     }
 
     @ViewBuilder
-    private var desktopBackground: some View {
+    private func desktopBackground(size: CGSize) -> some View {
         switch backgroundStyle {
+        case "Windows 11":
+            if let url = Bundle.main.url(
+                forResource: "hyperdroid_default_wallpaper",
+                withExtension: "jpg"
+            ),
+               let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            } else {
+                Color(red: 0.02, green: 0.20, blue: 0.42)
+            }
+
         case "Windows Blue":
             Color(red: 0.02, green: 0.20, blue: 0.42)
+
         case "Gradient":
             LinearGradient(
                 colors: [
@@ -242,6 +276,7 @@ struct DesktopView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
         default:
             Color.black
         }
