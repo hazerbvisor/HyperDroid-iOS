@@ -35,7 +35,7 @@
   ],
   "infoPlist": "HyperDroidIOSInfo.plist",
   "shortVersion": "0.1.0",
-  "buildVersion": "1",
+  "buildVersion": "2",
   "reuseCompilerEngine": true,
   "reuseBundledRuntime": true
 }
